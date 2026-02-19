@@ -1,0 +1,2992 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>goaquatemp: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/user/goaquatemp/client.go (82.6%)</option>
+				
+				<option value="file1">github.com/user/goaquatemp/cmd/aquatemp/commands.go (19.7%)</option>
+				
+				<option value="file2">github.com/user/goaquatemp/cmd/aquatemp/main.go (30.8%)</option>
+				
+				<option value="file3">github.com/user/goaquatemp/cmd/aquatemp/output.go (0.0%)</option>
+				
+				<option value="file4">github.com/user/goaquatemp/config.go (85.4%)</option>
+				
+				<option value="file5">github.com/user/goaquatemp/device.go (88.9%)</option>
+				
+				<option value="file6">github.com/user/goaquatemp/errors.go (13.6%)</option>
+				
+				<option value="file7">github.com/user/goaquatemp/examples/monitor/main.go (0.0%)</option>
+				
+				<option value="file8">github.com/user/goaquatemp/examples/temperature/main.go (0.0%)</option>
+				
+				<option value="file9">github.com/user/goaquatemp/internal/api/requests.go (0.0%)</option>
+				
+				<option value="file10">github.com/user/goaquatemp/internal/api/responses.go (100.0%)</option>
+				
+				<option value="file11">github.com/user/goaquatemp/internal/auth/auth.go (33.3%)</option>
+				
+				<option value="file12">github.com/user/goaquatemp/internal/auth/token.go (84.2%)</option>
+				
+				<option value="file13">github.com/user/goaquatemp/internal/testutil/server.go (0.0%)</option>
+				
+				<option value="file14">github.com/user/goaquatemp/internal/transport/http.go (79.2%)</option>
+				
+				<option value="file15">github.com/user/goaquatemp/options.go (70.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package goaquatemp
+
+import (
+        "context"
+        "encoding/json"
+        "fmt"
+        "strconv"
+        "time"
+
+        "github.com/user/goaquatemp/internal/api"
+        "github.com/user/goaquatemp/internal/auth"
+        "github.com/user/goaquatemp/internal/transport"
+)
+
+// Client provides methods for interacting with the Aqua Temp API.
+type Client interface {
+        // Login authenticates with the Aqua Temp API.
+        Login(ctx context.Context) error
+
+        // Logout clears the authentication token.
+        Logout(ctx context.Context) error
+
+        // GetDevices returns a list of all devices.
+        GetDevices(ctx context.Context) ([]Device, error)
+
+        // GetDevice returns a specific device by code.
+        GetDevice(ctx context.Context, deviceCode string) (*Device, error)
+
+        // GetDeviceData returns the current sensor data for a device.
+        GetDeviceData(ctx context.Context, deviceCode string) (*DeviceData, error)
+
+        // SetTemperature sets the target temperature for a device.
+        SetTemperature(ctx context.Context, deviceCode string, temp float64) error
+
+        // SetMode sets the operation mode for a device.
+        SetMode(ctx context.Context, deviceCode string, mode OperationMode) error
+
+        // SetPower turns a device on or off.
+        SetPower(ctx context.Context, deviceCode string, on bool) error
+
+        // SetFanSpeed sets the fan speed for a device.
+        SetFanSpeed(ctx context.Context, deviceCode string, speed FanSpeed) error
+
+        // Control sends a compound control command to a device.
+        Control(ctx context.Context, command ControlCommand) error
+
+        // IsAuthenticated returns true if the client has a valid token.
+        IsAuthenticated() bool
+
+        // Config returns the client configuration.
+        Config() *Config
+}
+
+// client is the default implementation of Client.
+type client struct {
+        config *Config
+        auth   auth.AuthManager
+        http   transport.HTTPClient
+}
+
+// NewClient creates a new Aqua Temp client with the given options.
+func NewClient(opts ...Option) (Client, error) <span class="cov8" title="1">{
+        // Start with default config
+        config := DefaultConfig()
+
+        // Apply environment config first
+        envConfig := LoadConfigFromEnv()
+        WithConfig(envConfig)(config)
+
+        // Load config file (AQUATEMP_CONFIG env var or default path)
+        cfgPath := config.ConfigPath
+        if cfgPath == "" </span><span class="cov8" title="1">{
+                cfgPath = DefaultConfigPath()
+        }</span>
+        <span class="cov8" title="1">if cfgPath != "" </span><span class="cov8" title="1">{
+                if fileCfg, err := LoadConfigFile(cfgPath); err == nil </span><span class="cov0" title="0">{
+                        WithConfig(fileCfg)(config)
+                }</span>
+        }
+
+        // Apply provided options (highest priority)
+        <span class="cov8" title="1">for _, opt := range opts </span><span class="cov8" title="1">{
+                opt(config)
+        }</span>
+
+        // Create HTTP transport
+        <span class="cov8" title="1">httpClient := transport.NewClient(
+                config.GetBaseURL(),
+                config.Timeout,
+                config.RetryCount,
+                config.Debug,
+        )
+
+        // Create auth manager
+        authManager := auth.NewManager(
+                httpClient,
+                string(config.APIVersion),
+                config.Username,
+                config.Password,
+        )
+
+        return &amp;client{
+                config: config,
+                auth:   authManager,
+                http:   httpClient,
+        }, nil</span>
+}
+
+// Login authenticates with the Aqua Temp API.
+func (c *client) Login(ctx context.Context) error <span class="cov8" title="1">{
+        if err := c.config.Validate(); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">_, err := c.auth.Authenticate(ctx)
+        if err != nil </span><span class="cov8" title="1">{
+                return &amp;AuthError{
+                        Code:      -1,
+                        Message:   "login failed",
+                        Retryable: false,
+                        Err:       ErrInvalidCredentials,
+                }
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+// Logout clears the authentication token.
+func (c *client) Logout(ctx context.Context) error <span class="cov8" title="1">{
+        c.auth.Clear()
+        return nil
+}</span>
+
+// GetDevices returns a list of all devices.
+func (c *client) GetDevices(ctx context.Context) ([]Device, error) <span class="cov8" title="1">{
+        if err := c.ensureAuth(ctx); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">req := api.NewDeviceListRequest()
+        body, err := c.http.Post(ctx, api.EndpointDeviceList, req, c.auth.FormatTokenHeader())
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to get device list: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">var resp api.DeviceListResponse
+        if err := json.Unmarshal(body, &amp;resp); err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to parse device list response: %w", err)
+        }</span>
+
+        <span class="cov8" title="1">if !resp.IsSuccess() </span><span class="cov0" title="0">{
+                return nil, &amp;APIError{
+                        ErrorCode: resp.ErrorCode,
+                        Message:   resp.ErrorMessage,
+                }
+        }</span>
+
+        <span class="cov8" title="1">devices := make([]Device, len(resp.ObjectResult))
+        for i, d := range resp.ObjectResult </span><span class="cov8" title="1">{
+                devices[i] = deviceInfoToDevice(&amp;d)
+        }</span>
+
+        <span class="cov8" title="1">return devices, nil</span>
+}
+
+// GetDevice returns a specific device by code.
+func (c *client) GetDevice(ctx context.Context, deviceCode string) (*Device, error) <span class="cov8" title="1">{
+        devices, err := c.GetDevices(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">for _, d := range devices </span><span class="cov8" title="1">{
+                if d.Code == deviceCode </span><span class="cov8" title="1">{
+                        return &amp;d, nil
+                }</span>
+        }
+
+        <span class="cov8" title="1">return nil, &amp;DeviceError{
+                DeviceCode: deviceCode,
+                Operation:  "get",
+                Err:        ErrDeviceNotFound,
+        }</span>
+}
+
+// GetDeviceData returns the current sensor data for a device.
+func (c *client) GetDeviceData(ctx context.Context, deviceCode string) (*DeviceData, error) <span class="cov8" title="1">{
+        if err := c.ensureAuth(ctx); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">req := api.NewDeviceDataRequest(deviceCode)
+        body, err := c.http.Post(ctx, api.EndpointDeviceData, req, c.auth.FormatTokenHeader())
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, &amp;DeviceError{
+                        DeviceCode: deviceCode,
+                        Operation:  "getDeviceData",
+                        Err:        err,
+                }
+        }</span>
+
+        <span class="cov8" title="1">var resp api.DeviceDataResponse
+        if err := json.Unmarshal(body, &amp;resp); err != nil </span><span class="cov0" title="0">{
+                return nil, &amp;DeviceError{
+                        DeviceCode: deviceCode,
+                        Operation:  "parseDeviceData",
+                        Err:        err,
+                }
+        }</span>
+
+        <span class="cov8" title="1">if !resp.IsSuccess() </span><span class="cov0" title="0">{
+                return nil, &amp;APIError{
+                        ErrorCode: resp.ErrorCode,
+                        Message:   resp.ErrorMessage,
+                }
+        }</span>
+
+        <span class="cov8" title="1">parsed := resp.ParseDeviceData()
+        data := parsedDataToDeviceData(deviceCode, parsed)
+        return &amp;data, nil</span>
+}
+
+// SetTemperature sets the target temperature for a device.
+func (c *client) SetTemperature(ctx context.Context, deviceCode string, temp float64) error <span class="cov8" title="1">{
+        if err := ValidateTemperature(temp); err != nil </span><span class="cov8" title="1">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">return c.sendControl(ctx, deviceCode, api.ParamTargetTemp, strconv.FormatFloat(temp, 'f', 1, 64))</span>
+}
+
+// SetMode sets the operation mode for a device.
+func (c *client) SetMode(ctx context.Context, deviceCode string, mode OperationMode) error <span class="cov8" title="1">{
+        if err := ValidateMode(mode); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">return c.sendControl(ctx, deviceCode, api.ParamMode, modeToAPI(mode))</span>
+}
+
+// SetPower turns a device on or off.
+func (c *client) SetPower(ctx context.Context, deviceCode string, on bool) error <span class="cov8" title="1">{
+        value := api.APIPowerOff
+        if on </span><span class="cov8" title="1">{
+                value = api.APIPowerOn
+        }</span>
+
+        <span class="cov8" title="1">return c.sendControl(ctx, deviceCode, api.ParamPower, value)</span>
+}
+
+// SetFanSpeed sets the fan speed for a device.
+func (c *client) SetFanSpeed(ctx context.Context, deviceCode string, speed FanSpeed) error <span class="cov0" title="0">{
+        return c.sendControl(ctx, deviceCode, api.ParamFanSpeed, fanSpeedToAPI(speed))
+}</span>
+
+// Control sends a compound control command to a device.
+func (c *client) Control(ctx context.Context, command ControlCommand) error <span class="cov8" title="1">{
+        if command.DeviceCode == "" </span><span class="cov8" title="1">{
+                return &amp;ValidationError{
+                        Field:   "deviceCode",
+                        Value:   command.DeviceCode,
+                        Message: "device code is required",
+                }
+        }</span>
+
+        <span class="cov8" title="1">if command.TargetTemp != nil </span><span class="cov8" title="1">{
+                if err := ValidateTemperature(*command.TargetTemp); err != nil </span><span class="cov8" title="1">{
+                        return err
+                }</span>
+        }
+
+        <span class="cov8" title="1">if command.Mode != nil </span><span class="cov8" title="1">{
+                if err := ValidateMode(*command.Mode); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+        }
+
+        <span class="cov8" title="1">var values []api.ControlValue
+
+        if command.Power != nil </span><span class="cov8" title="1">{
+                value := api.APIPowerOff
+                if *command.Power </span><span class="cov8" title="1">{
+                        value = api.APIPowerOn
+                }</span>
+                <span class="cov8" title="1">values = append(values, api.ControlValue{ProtocolCode: api.ParamPower, Value: value})</span>
+        }
+
+        <span class="cov8" title="1">if command.Mode != nil </span><span class="cov8" title="1">{
+                values = append(values, api.ControlValue{ProtocolCode: api.ParamMode, Value: modeToAPI(*command.Mode)})
+        }</span>
+
+        <span class="cov8" title="1">if command.TargetTemp != nil </span><span class="cov8" title="1">{
+                values = append(values, api.ControlValue{ProtocolCode: api.ParamTargetTemp, Value: strconv.FormatFloat(*command.TargetTemp, 'f', 1, 64)})
+        }</span>
+
+        <span class="cov8" title="1">if command.FanSpeed != nil </span><span class="cov0" title="0">{
+                values = append(values, api.ControlValue{ProtocolCode: api.ParamFanSpeed, Value: fanSpeedToAPI(*command.FanSpeed)})
+        }</span>
+
+        <span class="cov8" title="1">if len(values) == 0 </span><span class="cov8" title="1">{
+                return nil
+        }</span>
+
+        <span class="cov8" title="1">if err := c.ensureAuth(ctx); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">for _, v := range values </span><span class="cov8" title="1">{
+                req := api.NewControlRequest(command.DeviceCode, v.ProtocolCode, v.Value)
+                body, err := c.http.Post(ctx, api.EndpointControl, req, c.auth.FormatTokenHeader())
+                if err != nil </span><span class="cov0" title="0">{
+                        return &amp;DeviceError{
+                                DeviceCode: command.DeviceCode,
+                                Operation:  "control",
+                                Err:        err,
+                        }
+                }</span>
+
+                <span class="cov8" title="1">var resp api.ControlResponse
+                if err := json.Unmarshal(body, &amp;resp); err != nil </span><span class="cov0" title="0">{
+                        return &amp;DeviceError{
+                                DeviceCode: command.DeviceCode,
+                                Operation:  "parseControlResponse",
+                                Err:        err,
+                        }
+                }</span>
+
+                <span class="cov8" title="1">if !resp.IsSuccess() </span><span class="cov0" title="0">{
+                        return &amp;APIError{
+                                ErrorCode: resp.ErrorCode,
+                                Message:   resp.ErrorMessage,
+                        }
+                }</span>
+        }
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// IsAuthenticated returns true if the client has a valid token.
+func (c *client) IsAuthenticated() bool <span class="cov8" title="1">{
+        return c.auth.IsAuthenticated()
+}</span>
+
+// Config returns the client configuration.
+func (c *client) Config() *Config <span class="cov8" title="1">{
+        return c.config
+}</span>
+
+// sendControl sends a control command to a device.
+func (c *client) sendControl(ctx context.Context, deviceCode, protocolCode, value string) error <span class="cov8" title="1">{
+        if err := c.ensureAuth(ctx); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">req := api.NewControlRequest(deviceCode, protocolCode, value)
+        body, err := c.http.Post(ctx, api.EndpointControl, req, c.auth.FormatTokenHeader())
+        if err != nil </span><span class="cov0" title="0">{
+                return &amp;DeviceError{
+                        DeviceCode: deviceCode,
+                        Operation:  "control",
+                        Err:        err,
+                }
+        }</span>
+
+        <span class="cov8" title="1">var resp api.ControlResponse
+        if err := json.Unmarshal(body, &amp;resp); err != nil </span><span class="cov0" title="0">{
+                return &amp;DeviceError{
+                        DeviceCode: deviceCode,
+                        Operation:  "parseControlResponse",
+                        Err:        err,
+                }
+        }</span>
+
+        <span class="cov8" title="1">if !resp.IsSuccess() </span><span class="cov0" title="0">{
+                return &amp;APIError{
+                        ErrorCode: resp.ErrorCode,
+                        Message:   resp.ErrorMessage,
+                }
+        }</span>
+
+        <span class="cov8" title="1">return nil</span>
+}
+
+// ensureAuth ensures we have a valid authentication token.
+func (c *client) ensureAuth(ctx context.Context) error <span class="cov8" title="1">{
+        if c.auth.IsAuthenticated() </span><span class="cov8" title="1">{
+                return nil
+        }</span>
+
+        <span class="cov0" title="0">if err := c.auth.EnsureAuthenticated(ctx); err != nil </span><span class="cov0" title="0">{
+                return &amp;AuthError{
+                        Code:      -1,
+                        Message:   "not authenticated",
+                        Retryable: true,
+                        Err:       ErrNotAuthenticated,
+                }
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+
+// Conversion functions
+
+func deviceInfoToDevice(info *api.DeviceInfo) Device <span class="cov8" title="1">{
+        return Device{
+                Code:        info.DeviceCode,
+                Name:        info.DeviceNick,
+                Type:        info.DeviceType,
+                Online:      info.IsOnline(),
+                ProductCode: info.ProductCode,
+                CreatedAt:   info.ParsedCreateTime(),
+        }
+}</span>
+
+func parsedDataToDeviceData(deviceCode string, parsed *api.ParsedDeviceData) DeviceData <span class="cov8" title="1">{
+        return DeviceData{
+                DeviceCode:  deviceCode,
+                Timestamp:   time.Now(),
+                Power:       parsed.Power,
+                Mode:        parseMode(parsed.Mode),
+                TargetTemp:  parsed.TargetTemp,
+                CurrentTemp: parsed.CurrentTemp,
+                InletTemp:   parsed.InletTemp,
+                OutletTemp:  parsed.OutletTemp,
+                AmbientTemp: parsed.AmbientTemp,
+                CoilTemp:    parsed.CoilTemp,
+                FanSpeed:    parseFanSpeed(parsed.FanSpeed),
+                ErrorCode:   parsed.ErrorCode,
+                RawParams:   parsed.RawParams,
+        }
+}</span>
+
+func parseMode(value string) OperationMode <span class="cov8" title="1">{
+        switch value </span>{
+        case api.APIModeOff:<span class="cov8" title="1">
+                return ModeOff</span>
+        case api.APIModeHeat:<span class="cov8" title="1">
+                return ModeHeat</span>
+        case api.APIModeCool:<span class="cov8" title="1">
+                return ModeCool</span>
+        case api.APIModeAuto:<span class="cov8" title="1">
+                return ModeAuto</span>
+        default:<span class="cov8" title="1">
+                return ModeOff</span>
+        }
+}
+
+func parseFanSpeed(value string) FanSpeed <span class="cov8" title="1">{
+        switch value </span>{
+        case api.APIFanLow:<span class="cov8" title="1">
+                return FanLow</span>
+        case api.APIFanMedium:<span class="cov8" title="1">
+                return FanMedium</span>
+        case api.APIFanHigh:<span class="cov8" title="1">
+                return FanHigh</span>
+        case api.APIFanAuto:<span class="cov8" title="1">
+                return FanAuto</span>
+        default:<span class="cov8" title="1">
+                return FanAuto</span>
+        }
+}
+
+func modeToAPI(mode OperationMode) string <span class="cov8" title="1">{
+        switch mode </span>{
+        case ModeOff:<span class="cov8" title="1">
+                return api.APIModeOff</span>
+        case ModeHeat:<span class="cov8" title="1">
+                return api.APIModeHeat</span>
+        case ModeCool:<span class="cov8" title="1">
+                return api.APIModeCool</span>
+        case ModeAuto:<span class="cov8" title="1">
+                return api.APIModeAuto</span>
+        default:<span class="cov8" title="1">
+                return api.APIModeOff</span>
+        }
+}
+
+func fanSpeedToAPI(speed FanSpeed) string <span class="cov8" title="1">{
+        switch speed </span>{
+        case FanLow:<span class="cov8" title="1">
+                return api.APIFanLow</span>
+        case FanMedium:<span class="cov8" title="1">
+                return api.APIFanMedium</span>
+        case FanHigh:<span class="cov8" title="1">
+                return api.APIFanHigh</span>
+        case FanAuto:<span class="cov8" title="1">
+                return api.APIFanAuto</span>
+        default:<span class="cov8" title="1">
+                return api.APIFanAuto</span>
+        }
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package main
+
+import (
+        "context"
+        "fmt"
+        "os"
+        "strconv"
+        "time"
+
+        "github.com/spf13/cobra"
+        "github.com/user/goaquatemp"
+)
+
+func getClient() (goaquatemp.Client, error) <span class="cov0" title="0">{
+        opts := []goaquatemp.Option{
+                goaquatemp.WithEnvConfig(),
+        }
+
+        if debug </span><span class="cov0" title="0">{
+                opts = append(opts, goaquatemp.WithDebug(true))
+        }</span>
+
+        <span class="cov0" title="0">return goaquatemp.NewClient(opts...)</span>
+}
+
+func getDeviceCode(client goaquatemp.Client) string <span class="cov8" title="1">{
+        if deviceCode != "" </span><span class="cov8" title="1">{
+                return deviceCode
+        }</span>
+        <span class="cov8" title="1">if env := os.Getenv("AQUATEMP_DEFAULT_DEVICE"); env != "" </span><span class="cov8" title="1">{
+                return env
+        }</span>
+        <span class="cov8" title="1">if client.Config().DefaultDevice != "" </span><span class="cov8" title="1">{
+                return client.Config().DefaultDevice
+        }</span>
+        <span class="cov8" title="1">return ""</span>
+}
+
+func requireDeviceCode(client goaquatemp.Client) (string, error) <span class="cov8" title="1">{
+        code := getDeviceCode(client)
+        if code == "" </span><span class="cov8" title="1">{
+                return "", fmt.Errorf("device code required: use --device flag or set AQUATEMP_DEFAULT_DEVICE")
+        }</span>
+        <span class="cov8" title="1">return code, nil</span>
+}
+
+// login command
+func newLoginCmd() *cobra.Command <span class="cov8" title="1">{
+        return &amp;cobra.Command{
+                Use:   "login",
+                Short: "Authenticate with the Aqua Temp API",
+                RunE: func(cmd *cobra.Command, args []string) error </span><span class="cov0" title="0">{
+                        client, err := getClient()
+                        if err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+
+                        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+                        defer cancel()
+
+                        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                                return fmt.Errorf("login failed: %w", err)
+                        }</span>
+
+                        <span class="cov0" title="0">fmt.Println("Login successful")
+                        return nil</span>
+                },
+        }
+}
+
+// devices command
+func newDevicesCmd() *cobra.Command <span class="cov8" title="1">{
+        cmd := &amp;cobra.Command{
+                Use:   "devices",
+                Short: "List and manage devices",
+        }
+
+        listCmd := &amp;cobra.Command{
+                Use:   "list",
+                Short: "List all devices",
+                RunE:  runDevicesList,
+        }
+
+        infoCmd := &amp;cobra.Command{
+                Use:   "info",
+                Short: "Show device information",
+                RunE:  runDevicesInfo,
+        }
+
+        cmd.AddCommand(listCmd, infoCmd)
+        return cmd
+}</span>
+
+func runDevicesList(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+        client, err := getClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">devices, err := client.GetDevices(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to get devices: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">if outputJSON </span><span class="cov0" title="0">{
+                return printJSON(devices)
+        }</span>
+
+        <span class="cov0" title="0">if outputCSV </span><span class="cov0" title="0">{
+                return printDevicesCSV(devices)
+        }</span>
+
+        <span class="cov0" title="0">return printDevicesTable(devices)</span>
+}
+
+func runDevicesInfo(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+        client, err := getClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">code, err := requireDeviceCode(client)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">device, err := client.GetDevice(ctx, code)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to get device: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">if outputJSON </span><span class="cov0" title="0">{
+                return printJSON(device)
+        }</span>
+
+        <span class="cov0" title="0">return printDeviceInfo(device)</span>
+}
+
+// temp command
+func newTempCmd() *cobra.Command <span class="cov8" title="1">{
+        cmd := &amp;cobra.Command{
+                Use:   "temp",
+                Short: "Get temperature data",
+        }
+
+        getCmd := &amp;cobra.Command{
+                Use:   "get",
+                Short: "Get current temperature data",
+                RunE:  runTempGet,
+        }
+
+        var hours int
+        var interval int
+        historyCmd := &amp;cobra.Command{
+                Use:   "history",
+                Short: "Poll temperature data over time",
+                RunE: func(cmd *cobra.Command, args []string) error </span><span class="cov0" title="0">{
+                        return runTempHistory(hours, interval)
+                }</span>,
+        }
+        <span class="cov8" title="1">historyCmd.Flags().IntVar(&amp;hours, "hours", 1, "Duration to poll in hours")
+        historyCmd.Flags().IntVar(&amp;interval, "interval", 300, "Poll interval in seconds")
+
+        cmd.AddCommand(getCmd, historyCmd)
+        return cmd</span>
+}
+
+func runTempGet(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+        client, err := getClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">code, err := requireDeviceCode(client)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">data, err := client.GetDeviceData(ctx, code)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to get temperature data: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">if outputJSON </span><span class="cov0" title="0">{
+                return printJSON(data)
+        }</span>
+
+        <span class="cov0" title="0">if outputCSV </span><span class="cov0" title="0">{
+                return printTempCSV(data)
+        }</span>
+
+        <span class="cov0" title="0">return printTempTable(data)</span>
+}
+
+func runTempHistory(hours, interval int) error <span class="cov0" title="0">{
+        client, err := getClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">code, err := requireDeviceCode(client)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), time.Duration(hours)*time.Hour+time.Minute)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">endTime := time.Now().Add(time.Duration(hours) * time.Hour)
+        ticker := time.NewTicker(time.Duration(interval) * time.Second)
+        defer ticker.Stop()
+
+        if outputCSV </span><span class="cov0" title="0">{
+                fmt.Println("timestamp,target,current,inlet,outlet,ambient")
+        }</span>
+
+        <span class="cov0" title="0">readAndPrint := func() </span><span class="cov0" title="0">{
+                data, err := client.GetDeviceData(ctx, code)
+                if err != nil </span><span class="cov0" title="0">{
+                        fmt.Fprintf(os.Stderr, "error: %v\n", err)
+                        return
+                }</span>
+                <span class="cov0" title="0">now := time.Now().Format("15:04:05")
+                if outputJSON </span><span class="cov0" title="0">{
+                        printJSON(map[string]any{
+                                "timestamp": now,
+                                "target":    data.TargetTemp,
+                                "current":   data.CurrentTemp,
+                                "inlet":     data.InletTemp,
+                                "outlet":    data.OutletTemp,
+                                "ambient":   data.AmbientTemp,
+                        })
+                }</span> else<span class="cov0" title="0"> if outputCSV </span><span class="cov0" title="0">{
+                        fmt.Printf("%s,%s,%s,%s,%s,%s\n",
+                                now,
+                                tempStr(data.TargetTemp),
+                                tempStr(data.CurrentTemp),
+                                tempStr(data.InletTemp),
+                                tempStr(data.OutletTemp),
+                                tempStr(data.AmbientTemp),
+                        )
+                }</span> else<span class="cov0" title="0"> {
+                        fmt.Printf("[%s] Target: %s°C  Current: %s°C  Inlet: %s°C  Outlet: %s°C  Ambient: %s°C\n",
+                                now,
+                                tempStr(data.TargetTemp),
+                                tempStr(data.CurrentTemp),
+                                tempStr(data.InletTemp),
+                                tempStr(data.OutletTemp),
+                                tempStr(data.AmbientTemp),
+                        )
+                }</span>
+        }
+
+        <span class="cov0" title="0">readAndPrint()
+
+        for </span><span class="cov0" title="0">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov0" title="0">
+                        return nil</span>
+                case t := &lt;-ticker.C:<span class="cov0" title="0">
+                        if t.After(endTime) </span><span class="cov0" title="0">{
+                                return nil
+                        }</span>
+                        <span class="cov0" title="0">readAndPrint()</span>
+                }
+        }
+}
+
+// status command
+func newStatusCmd() *cobra.Command <span class="cov8" title="1">{
+        return &amp;cobra.Command{
+                Use:   "status",
+                Short: "Show full device status",
+                RunE:  runStatus,
+        }
+}</span>
+
+func runStatus(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+        client, err := getClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">code, err := requireDeviceCode(client)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">device, err := client.GetDevice(ctx, code)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to get device: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">data, err := client.GetDeviceData(ctx, code)
+        if err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to get device data: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">if outputJSON </span><span class="cov0" title="0">{
+                return printJSON(map[string]any{
+                        "device": device,
+                        "data":   data,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return printStatus(device, data)</span>
+}
+
+// control command
+func newControlCmd() *cobra.Command <span class="cov8" title="1">{
+        cmd := &amp;cobra.Command{
+                Use:   "control",
+                Short: "Control device settings",
+        }
+
+        // power subcommand
+        var powerOn, powerOff bool
+        powerCmd := &amp;cobra.Command{
+                Use:   "power",
+                Short: "Turn device on or off",
+                RunE: func(cmd *cobra.Command, args []string) error </span><span class="cov0" title="0">{
+                        if !powerOn &amp;&amp; !powerOff </span><span class="cov0" title="0">{
+                                return fmt.Errorf("specify --on or --off")
+                        }</span>
+                        <span class="cov0" title="0">return runControlPower(powerOn)</span>
+                },
+        }
+        <span class="cov8" title="1">powerCmd.Flags().BoolVar(&amp;powerOn, "on", false, "Turn device on")
+        powerCmd.Flags().BoolVar(&amp;powerOff, "off", false, "Turn device off")
+
+        // set-temp subcommand
+        var targetTemp float64
+        setTempCmd := &amp;cobra.Command{
+                Use:   "set-temp",
+                Short: "Set target temperature",
+                RunE: func(cmd *cobra.Command, args []string) error </span><span class="cov0" title="0">{
+                        if targetTemp == 0 </span><span class="cov0" title="0">{
+                                return fmt.Errorf("specify temperature with --temp")
+                        }</span>
+                        <span class="cov0" title="0">return runControlTemp(targetTemp)</span>
+                },
+        }
+        <span class="cov8" title="1">setTempCmd.Flags().Float64VarP(&amp;targetTemp, "temp", "t", 0, "Target temperature in Celsius")
+
+        // mode subcommand
+        var modeHeat, modeCool, modeAuto, modeOff bool
+        modeCmd := &amp;cobra.Command{
+                Use:   "mode",
+                Short: "Set operation mode",
+                RunE: func(cmd *cobra.Command, args []string) error </span><span class="cov0" title="0">{
+                        var mode goaquatemp.OperationMode
+                        switch </span>{
+                        case modeHeat:<span class="cov0" title="0">
+                                mode = goaquatemp.ModeHeat</span>
+                        case modeCool:<span class="cov0" title="0">
+                                mode = goaquatemp.ModeCool</span>
+                        case modeAuto:<span class="cov0" title="0">
+                                mode = goaquatemp.ModeAuto</span>
+                        case modeOff:<span class="cov0" title="0">
+                                mode = goaquatemp.ModeOff</span>
+                        default:<span class="cov0" title="0">
+                                return fmt.Errorf("specify --heat, --cool, --auto, or --off")</span>
+                        }
+                        <span class="cov0" title="0">return runControlMode(mode)</span>
+                },
+        }
+        <span class="cov8" title="1">modeCmd.Flags().BoolVar(&amp;modeHeat, "heat", false, "Set heat mode")
+        modeCmd.Flags().BoolVar(&amp;modeCool, "cool", false, "Set cool mode")
+        modeCmd.Flags().BoolVar(&amp;modeAuto, "auto", false, "Set auto mode")
+        modeCmd.Flags().BoolVar(&amp;modeOff, "off", false, "Turn off")
+
+        // fan-speed subcommand
+        var fanSpeed string
+        fanSpeedCmd := &amp;cobra.Command{
+                Use:   "fan-speed",
+                Short: "Set fan speed",
+                RunE: func(cmd *cobra.Command, args []string) error </span><span class="cov0" title="0">{
+                        var speed goaquatemp.FanSpeed
+                        switch fanSpeed </span>{
+                        case "low":<span class="cov0" title="0">
+                                speed = goaquatemp.FanLow</span>
+                        case "medium":<span class="cov0" title="0">
+                                speed = goaquatemp.FanMedium</span>
+                        case "high":<span class="cov0" title="0">
+                                speed = goaquatemp.FanHigh</span>
+                        case "auto":<span class="cov0" title="0">
+                                speed = goaquatemp.FanAuto</span>
+                        default:<span class="cov0" title="0">
+                                return fmt.Errorf("invalid fan speed %q: use low, medium, high, or auto", fanSpeed)</span>
+                        }
+                        <span class="cov0" title="0">return runControlFanSpeed(speed)</span>
+                },
+        }
+        <span class="cov8" title="1">fanSpeedCmd.Flags().StringVar(&amp;fanSpeed, "speed", "", "Fan speed: low, medium, high, auto")
+        fanSpeedCmd.MarkFlagRequired("speed")
+
+        cmd.AddCommand(powerCmd, setTempCmd, modeCmd, fanSpeedCmd)
+        return cmd</span>
+}
+
+func runControlPower(on bool) error <span class="cov0" title="0">{
+        client, err := getClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">code, err := requireDeviceCode(client)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">if err := client.SetPower(ctx, code, on); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to set power: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">state := "off"
+        if on </span><span class="cov0" title="0">{
+                state = "on"
+        }</span>
+        <span class="cov0" title="0">fmt.Printf("Device power set to %s\n", state)
+        return nil</span>
+}
+
+func runControlTemp(temp float64) error <span class="cov0" title="0">{
+        client, err := getClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">code, err := requireDeviceCode(client)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">if err := client.SetTemperature(ctx, code, temp); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to set temperature: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("Target temperature set to %.1f°C\n", temp)
+        return nil</span>
+}
+
+func runControlMode(mode goaquatemp.OperationMode) error <span class="cov0" title="0">{
+        client, err := getClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">code, err := requireDeviceCode(client)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">if err := client.SetMode(ctx, code, mode); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to set mode: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("Operation mode set to %s\n", mode)
+        return nil</span>
+}
+
+func runControlFanSpeed(speed goaquatemp.FanSpeed) error <span class="cov0" title="0">{
+        client, err := getClient()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">code, err := requireDeviceCode(client)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("login failed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">if err := client.SetFanSpeed(ctx, code, speed); err != nil </span><span class="cov0" title="0">{
+                return fmt.Errorf("failed to set fan speed: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("Fan speed set to %s\n", speed)
+        return nil</span>
+}
+
+// Helper to convert float to string for display
+func tempStr(temp float64) string <span class="cov8" title="1">{
+        return strconv.FormatFloat(temp, 'f', 1, 64)
+}</span>
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package main
+
+import (
+        "fmt"
+        "os"
+
+        "github.com/spf13/cobra"
+)
+
+var (
+        version = "dev"
+        commit  = "none"
+        date    = "unknown"
+)
+
+var (
+        // Global flags
+        deviceCode string
+        outputJSON bool
+        outputCSV  bool
+        debug      bool
+)
+
+func main() <span class="cov0" title="0">{
+        rootCmd := &amp;cobra.Command{
+                Use:   "aquatemp",
+                Short: "CLI tool for Aqua Temp heat pump control",
+                Long: `aquatemp is a command-line interface for monitoring and controlling
+Aqua Temp heat pumps via the Linked-Go cloud API.
+
+Configure credentials via environment variables:
+  AQUATEMP_USERNAME - Your account email
+  AQUATEMP_PASSWORD - Your account password
+
+Or create a config file at ~/.config/aquatemp/config.yaml`,
+        }
+
+        // Global flags
+        rootCmd.PersistentFlags().StringVarP(&amp;deviceCode, "device", "d", "", "Device code (or set AQUATEMP_DEFAULT_DEVICE)")
+        rootCmd.PersistentFlags().BoolVar(&amp;outputJSON, "json", false, "Output in JSON format")
+        rootCmd.PersistentFlags().BoolVar(&amp;outputCSV, "csv", false, "Output in CSV format")
+        rootCmd.PersistentFlags().BoolVar(&amp;debug, "debug", false, "Enable debug output")
+
+        // Add commands
+        rootCmd.AddCommand(
+                newLoginCmd(),
+                newDevicesCmd(),
+                newTempCmd(),
+                newStatusCmd(),
+                newControlCmd(),
+                newVersionCmd(),
+        )
+
+        if err := rootCmd.Execute(); err != nil </span><span class="cov0" title="0">{
+                fmt.Fprintln(os.Stderr, err)
+                os.Exit(1)
+        }</span>
+}
+
+func newVersionCmd() *cobra.Command <span class="cov8" title="1">{
+        return &amp;cobra.Command{
+                Use:   "version",
+                Short: "Show version information",
+                Run: func(cmd *cobra.Command, args []string) </span><span class="cov8" title="1">{
+                        fmt.Printf("aquatemp %s\n", version)
+                        fmt.Printf("  commit: %s\n", commit)
+                        fmt.Printf("  built:  %s\n", date)
+                }</span>,
+        }
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package main
+
+import (
+        "encoding/csv"
+        "encoding/json"
+        "fmt"
+        "os"
+        "strings"
+        "time"
+
+        "github.com/user/goaquatemp"
+)
+
+func printJSON(v any) error <span class="cov0" title="0">{
+        enc := json.NewEncoder(os.Stdout)
+        enc.SetIndent("", "  ")
+        return enc.Encode(v)
+}</span>
+
+func printDevicesTable(devices []goaquatemp.Device) error <span class="cov0" title="0">{
+        if len(devices) == 0 </span><span class="cov0" title="0">{
+                fmt.Println("No devices found")
+                return nil
+        }</span>
+
+        // Calculate column widths
+        <span class="cov0" title="0">codeWidth := 12
+        nameWidth := 20
+        for _, d := range devices </span><span class="cov0" title="0">{
+                if len(d.Code) &gt; codeWidth </span><span class="cov0" title="0">{
+                        codeWidth = len(d.Code)
+                }</span>
+                <span class="cov0" title="0">if len(d.Name) &gt; nameWidth </span><span class="cov0" title="0">{
+                        nameWidth = len(d.Name)
+                }</span>
+        }
+
+        // Header
+        <span class="cov0" title="0">fmt.Printf("%-*s  %-*s  %-8s  %s\n", codeWidth, "CODE", nameWidth, "NAME", "STATUS", "TYPE")
+        fmt.Println(strings.Repeat("-", codeWidth+nameWidth+25))
+
+        // Rows
+        for _, d := range devices </span><span class="cov0" title="0">{
+                status := "Offline"
+                if d.Online </span><span class="cov0" title="0">{
+                        status = "Online"
+                }</span>
+                <span class="cov0" title="0">fmt.Printf("%-*s  %-*s  %-8s  %s\n", codeWidth, d.Code, nameWidth, d.Name, status, d.Type)</span>
+        }
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func printDevicesCSV(devices []goaquatemp.Device) error <span class="cov0" title="0">{
+        w := csv.NewWriter(os.Stdout)
+        defer w.Flush()
+
+        w.Write([]string{"code", "name", "online", "type", "product_code", "created_at"})
+
+        for _, d := range devices </span><span class="cov0" title="0">{
+                online := "false"
+                if d.Online </span><span class="cov0" title="0">{
+                        online = "true"
+                }</span>
+                <span class="cov0" title="0">w.Write([]string{
+                        d.Code,
+                        d.Name,
+                        online,
+                        d.Type,
+                        d.ProductCode,
+                        d.CreatedAt.Format(time.RFC3339),
+                })</span>
+        }
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func printDeviceInfo(d *goaquatemp.Device) error <span class="cov0" title="0">{
+        status := "Offline"
+        if d.Online </span><span class="cov0" title="0">{
+                status = "Online"
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("Device: %s\n", d.Name)
+        fmt.Println(strings.Repeat("-", 30))
+        fmt.Printf("Code:        %s\n", d.Code)
+        fmt.Printf("Status:      %s\n", status)
+        fmt.Printf("Type:        %s\n", d.Type)
+        fmt.Printf("Product:     %s\n", d.ProductCode)
+        fmt.Printf("Created:     %s\n", d.CreatedAt.Format("2006-01-02 15:04:05"))
+
+        return nil</span>
+}
+
+func printTempTable(data *goaquatemp.DeviceData) error <span class="cov0" title="0">{
+        fmt.Printf("Temperature Data (%s)\n", data.Timestamp.Format("2006-01-02 15:04:05"))
+        fmt.Println(strings.Repeat("-", 30))
+        fmt.Printf("Target:      %s°C\n", tempStr(data.TargetTemp))
+        fmt.Printf("Current:     %s°C\n", tempStr(data.CurrentTemp))
+        fmt.Printf("Inlet:       %s°C\n", tempStr(data.InletTemp))
+        fmt.Printf("Outlet:      %s°C\n", tempStr(data.OutletTemp))
+        fmt.Printf("Ambient:     %s°C\n", tempStr(data.AmbientTemp))
+        fmt.Printf("Coil:        %s°C\n", tempStr(data.CoilTemp))
+
+        return nil
+}</span>
+
+func printTempCSV(data *goaquatemp.DeviceData) error <span class="cov0" title="0">{
+        w := csv.NewWriter(os.Stdout)
+        defer w.Flush()
+
+        w.Write([]string{"metric", "value", "unit"})
+        w.Write([]string{"target", tempStr(data.TargetTemp), "C"})
+        w.Write([]string{"current", tempStr(data.CurrentTemp), "C"})
+        w.Write([]string{"inlet", tempStr(data.InletTemp), "C"})
+        w.Write([]string{"outlet", tempStr(data.OutletTemp), "C"})
+        w.Write([]string{"ambient", tempStr(data.AmbientTemp), "C"})
+        w.Write([]string{"coil", tempStr(data.CoilTemp), "C"})
+
+        return nil
+}</span>
+
+func printStatus(device *goaquatemp.Device, data *goaquatemp.DeviceData) error <span class="cov0" title="0">{
+        status := "Offline"
+        if device.Online </span><span class="cov0" title="0">{
+                status = "Online"
+        }</span>
+
+        <span class="cov0" title="0">power := "OFF"
+        if data.Power </span><span class="cov0" title="0">{
+                power = "ON"
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("Device: %s (%s)\n", device.Name, device.Code)
+        fmt.Println(strings.Repeat("=", 40))
+
+        fmt.Printf("\nStatus\n")
+        fmt.Println(strings.Repeat("-", 20))
+        fmt.Printf("Connection:  %s\n", status)
+        fmt.Printf("Power:       %s\n", power)
+        fmt.Printf("Mode:        %s\n", data.Mode)
+        fmt.Printf("Fan Speed:   %s\n", data.FanSpeed)
+
+        if data.ErrorCode != 0 </span><span class="cov0" title="0">{
+                fmt.Printf("Error Code:  %d\n", data.ErrorCode)
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("\nTemperatures\n")
+        fmt.Println(strings.Repeat("-", 20))
+        fmt.Printf("Target:      %s°C\n", tempStr(data.TargetTemp))
+        fmt.Printf("Current:     %s°C\n", tempStr(data.CurrentTemp))
+        fmt.Printf("Inlet:       %s°C\n", tempStr(data.InletTemp))
+        fmt.Printf("Outlet:      %s°C\n", tempStr(data.OutletTemp))
+        fmt.Printf("Ambient:     %s°C\n", tempStr(data.AmbientTemp))
+        fmt.Printf("Coil:        %s°C\n", tempStr(data.CoilTemp))
+
+        fmt.Printf("\nTimestamp: %s\n", data.Timestamp.Format(time.RFC3339))
+
+        return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package goaquatemp
+
+import (
+        "os"
+        "path/filepath"
+        "strconv"
+        "time"
+
+        "gopkg.in/yaml.v3"
+)
+
+// APIVersion represents the version of the Aqua Temp API to use.
+type APIVersion string
+
+const (
+        // APILegacy is for accounts created before app v1.5.8.
+        APILegacy APIVersion = "legacy"
+        // APIHiTemp is for HiTemp branded devices.
+        APIHiTemp APIVersion = "hitemp"
+        // APIModern is for accounts created with app v1.5.9+ (default).
+        APIModern APIVersion = "modern"
+)
+
+// API base URLs for different versions.
+const (
+        BaseURLLegacy = "https://cloud.linked-go.com/cloudservice/api"
+        BaseURLHiTemp = "https://cloud.linked-go.com/cloudservice/api"
+        BaseURLModern = "https://cloud.linked-go.com:449/crmservice/api"
+)
+
+// Config holds the configuration for the Aqua Temp client.
+type Config struct {
+        Username      string        `yaml:"username"`
+        Password      string        `yaml:"password"`
+        APIVersion    APIVersion    `yaml:"api_version"`
+        BaseURL       string        `yaml:"base_url"`
+        Timeout       time.Duration `yaml:"timeout"`
+        RetryCount    int           `yaml:"retry_count"`
+        Debug         bool          `yaml:"debug"`
+        DefaultDevice string        `yaml:"default_device"`
+        ConfigPath    string        `yaml:"-"`
+}
+
+// DefaultConfig returns a Config with default values.
+func DefaultConfig() *Config <span class="cov8" title="1">{
+        return &amp;Config{
+                APIVersion: APIModern,
+                Timeout:    30 * time.Second,
+                RetryCount: 3,
+                Debug:      false,
+        }
+}</span>
+
+// GetBaseURL returns the base URL for the configured API version.
+func (c *Config) GetBaseURL() string <span class="cov8" title="1">{
+        if c.BaseURL != "" </span><span class="cov8" title="1">{
+                return c.BaseURL
+        }</span>
+
+        <span class="cov8" title="1">switch c.APIVersion </span>{
+        case APILegacy:<span class="cov8" title="1">
+                return BaseURLLegacy</span>
+        case APIHiTemp:<span class="cov8" title="1">
+                return BaseURLHiTemp</span>
+        case APIModern:<span class="cov8" title="1">
+                return BaseURLModern</span>
+        default:<span class="cov0" title="0">
+                return BaseURLModern</span>
+        }
+}
+
+// LoadConfigFile loads configuration from a YAML file.
+func LoadConfigFile(path string) (*Config, error) <span class="cov8" title="1">{
+        // Expand ~ to home directory
+        if len(path) &gt; 0 &amp;&amp; path[0] == '~' </span><span class="cov0" title="0">{
+                home, err := os.UserHomeDir()
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">path = filepath.Join(home, path[1:])</span>
+        }
+
+        <span class="cov8" title="1">data, err := os.ReadFile(path)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">config := DefaultConfig()
+        if err := yaml.Unmarshal(data, config); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov8" title="1">return config, nil</span>
+}
+
+// LoadConfigFromEnv loads configuration from environment variables.
+func LoadConfigFromEnv() *Config <span class="cov8" title="1">{
+        config := DefaultConfig()
+
+        if v := os.Getenv("AQUATEMP_USERNAME"); v != "" </span><span class="cov8" title="1">{
+                config.Username = v
+        }</span>
+        <span class="cov8" title="1">if v := os.Getenv("AQUATEMP_PASSWORD"); v != "" </span><span class="cov8" title="1">{
+                config.Password = v
+        }</span>
+        <span class="cov8" title="1">if v := os.Getenv("AQUATEMP_API_VERSION"); v != "" </span><span class="cov8" title="1">{
+                config.APIVersion = APIVersion(v)
+        }</span>
+        <span class="cov8" title="1">if v := os.Getenv("AQUATEMP_BASE_URL"); v != "" </span><span class="cov8" title="1">{
+                config.BaseURL = v
+        }</span>
+        <span class="cov8" title="1">if v := os.Getenv("AQUATEMP_TIMEOUT"); v != "" </span><span class="cov8" title="1">{
+                if d, err := time.ParseDuration(v); err == nil </span><span class="cov8" title="1">{
+                        config.Timeout = d
+                }</span>
+        }
+        <span class="cov8" title="1">if v := os.Getenv("AQUATEMP_DEBUG"); v != "" </span><span class="cov8" title="1">{
+                config.Debug, _ = strconv.ParseBool(v)
+        }</span>
+        <span class="cov8" title="1">if v := os.Getenv("AQUATEMP_DEFAULT_DEVICE"); v != "" </span><span class="cov8" title="1">{
+                config.DefaultDevice = v
+        }</span>
+        <span class="cov8" title="1">if v := os.Getenv("AQUATEMP_CONFIG"); v != "" </span><span class="cov8" title="1">{
+                config.ConfigPath = v
+        }</span>
+
+        <span class="cov8" title="1">return config</span>
+}
+
+// DefaultConfigPath returns the default config file path.
+func DefaultConfigPath() string <span class="cov8" title="1">{
+        home, err := os.UserHomeDir()
+        if err != nil </span><span class="cov0" title="0">{
+                return ""
+        }</span>
+        <span class="cov8" title="1">return filepath.Join(home, ".config", "aquatemp", "config.yaml")</span>
+}
+
+// Validate checks if the configuration is valid.
+func (c *Config) Validate() error <span class="cov8" title="1">{
+        if c.Username == "" </span><span class="cov8" title="1">{
+                return &amp;ValidationError{Field: "username", Value: "", Message: "username is required"}
+        }</span>
+        <span class="cov8" title="1">if c.Password == "" </span><span class="cov8" title="1">{
+                return &amp;ValidationError{Field: "password", Value: "", Message: "password is required"}
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package goaquatemp
+
+import "time"
+
+// OperationMode represents the heat pump operation mode.
+type OperationMode string
+
+const (
+        ModeOff  OperationMode = "off"
+        ModeHeat OperationMode = "heat"
+        ModeCool OperationMode = "cool"
+        ModeAuto OperationMode = "auto"
+)
+
+// FanSpeed represents the fan speed setting.
+type FanSpeed string
+
+const (
+        FanLow    FanSpeed = "low"
+        FanMedium FanSpeed = "medium"
+        FanHigh   FanSpeed = "high"
+        FanAuto   FanSpeed = "auto"
+)
+
+// Device represents an Aqua Temp heat pump device.
+type Device struct {
+        Code        string    `json:"code"`
+        Name        string    `json:"name"`
+        Type        string    `json:"type"`
+        Online      bool      `json:"online"`
+        ProductCode string    `json:"productCode"`
+        CreatedAt   time.Time `json:"createdAt"`
+}
+
+// DeviceData contains the current sensor data and status for a device.
+type DeviceData struct {
+        DeviceCode  string            `json:"deviceCode"`
+        Timestamp   time.Time         `json:"timestamp"`
+        Power       bool              `json:"power"`
+        Mode        OperationMode     `json:"mode"`
+        TargetTemp  float64           `json:"targetTemp"`
+        CurrentTemp float64           `json:"currentTemp"`
+        InletTemp   float64           `json:"inletTemp"`
+        OutletTemp  float64           `json:"outletTemp"`
+        AmbientTemp float64           `json:"ambientTemp"`
+        CoilTemp    float64           `json:"coilTemp"`
+        FanSpeed    FanSpeed          `json:"fanSpeed"`
+        ErrorCode   int               `json:"errorCode"`
+        RawParams   map[string]string `json:"rawParams,omitempty"`
+}
+
+// ControlCommand represents a command to control a device.
+type ControlCommand struct {
+        DeviceCode string
+        Power      *bool
+        Mode       *OperationMode
+        TargetTemp *float64
+        FanSpeed   *FanSpeed
+}
+
+// Temperature limits.
+const (
+        MinTemperature = 15.0
+        MaxTemperature = 40.0
+)
+
+// ValidateTemperature checks if a temperature value is within valid range.
+func ValidateTemperature(temp float64) error <span class="cov8" title="1">{
+        if temp &lt; MinTemperature || temp &gt; MaxTemperature </span><span class="cov8" title="1">{
+                return &amp;ValidationError{
+                        Field:   "temperature",
+                        Value:   temp,
+                        Message: "temperature must be between 15°C and 40°C",
+                        Err:     ErrInvalidTemperature,
+                }
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+// ValidateMode checks if an operation mode is valid.
+func ValidateMode(mode OperationMode) error <span class="cov8" title="1">{
+        switch mode </span>{
+        case ModeOff, ModeHeat, ModeCool, ModeAuto:<span class="cov8" title="1">
+                return nil</span>
+        default:<span class="cov8" title="1">
+                return &amp;ValidationError{
+                        Field:   "mode",
+                        Value:   mode,
+                        Message: "invalid operation mode",
+                        Err:     ErrInvalidMode,
+                }</span>
+        }
+}
+
+// IsOnline returns true if the device is online.
+func (d *Device) IsOnline() bool <span class="cov0" title="0">{
+        return d.Online
+}</span>
+
+// HasError returns true if the device has an error.
+func (d *DeviceData) HasError() bool <span class="cov8" title="1">{
+        return d.ErrorCode != 0
+}</span>
+
+// IsPoweredOn returns true if the device is powered on.
+func (d *DeviceData) IsPoweredOn() bool <span class="cov8" title="1">{
+        return d.Power
+}</span>
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package goaquatemp
+
+import (
+        "errors"
+        "fmt"
+)
+
+// Sentinel errors for common error conditions.
+var (
+        ErrNotAuthenticated   = errors.New("not authenticated")
+        ErrInvalidCredentials = errors.New("invalid credentials")
+        ErrTokenExpired       = errors.New("token expired")
+        ErrDeviceNotFound     = errors.New("device not found")
+        ErrDeviceOffline      = errors.New("device offline")
+        ErrInvalidTemperature = errors.New("temperature out of valid range")
+        ErrInvalidMode        = errors.New("invalid operation mode")
+)
+
+// AuthError represents an authentication-related error.
+type AuthError struct {
+        Code      int
+        Message   string
+        Retryable bool
+        Err       error
+}
+
+func (e *AuthError) Error() string <span class="cov0" title="0">{
+        if e.Err != nil </span><span class="cov0" title="0">{
+                return fmt.Sprintf("auth error %d: %s: %v", e.Code, e.Message, e.Err)
+        }</span>
+        <span class="cov0" title="0">return fmt.Sprintf("auth error %d: %s", e.Code, e.Message)</span>
+}
+
+func (e *AuthError) Unwrap() error <span class="cov8" title="1">{
+        return e.Err
+}</span>
+
+// APIError represents an error returned by the Aqua Temp API.
+type APIError struct {
+        StatusCode int
+        ErrorCode  int
+        Message    string
+}
+
+func (e *APIError) Error() string <span class="cov0" title="0">{
+        return fmt.Sprintf("api error %d (http %d): %s", e.ErrorCode, e.StatusCode, e.Message)
+}</span>
+
+// DeviceError represents an error related to a specific device operation.
+type DeviceError struct {
+        DeviceCode string
+        Operation  string
+        Err        error
+}
+
+func (e *DeviceError) Error() string <span class="cov0" title="0">{
+        return fmt.Sprintf("device %s: %s failed: %v", e.DeviceCode, e.Operation, e.Err)
+}</span>
+
+func (e *DeviceError) Unwrap() error <span class="cov8" title="1">{
+        return e.Err
+}</span>
+
+// ValidationError represents a validation error for input parameters.
+type ValidationError struct {
+        Field   string
+        Value   any
+        Message string
+        Err     error
+}
+
+func (e *ValidationError) Error() string <span class="cov0" title="0">{
+        return fmt.Sprintf("validation error: %s=%v: %s", e.Field, e.Value, e.Message)
+}</span>
+
+func (e *ValidationError) Unwrap() error <span class="cov8" title="1">{
+        return e.Err
+}</span>
+
+// IsAuthError returns true if the error is an authentication error.
+func IsAuthError(err error) bool <span class="cov0" title="0">{
+        var authErr *AuthError
+        return errors.As(err, &amp;authErr)
+}</span>
+
+// IsAPIError returns true if the error is an API error.
+func IsAPIError(err error) bool <span class="cov0" title="0">{
+        var apiErr *APIError
+        return errors.As(err, &amp;apiErr)
+}</span>
+
+// IsDeviceError returns true if the error is a device error.
+func IsDeviceError(err error) bool <span class="cov0" title="0">{
+        var deviceErr *DeviceError
+        return errors.As(err, &amp;deviceErr)
+}</span>
+
+// IsRetryable returns true if the error is retryable.
+func IsRetryable(err error) bool <span class="cov0" title="0">{
+        var authErr *AuthError
+        if errors.As(err, &amp;authErr) </span><span class="cov0" title="0">{
+                return authErr.Retryable
+        }</span>
+
+        <span class="cov0" title="0">var apiErr *APIError
+        if errors.As(err, &amp;apiErr) </span><span class="cov0" title="0">{
+                // Retry on server errors
+                return apiErr.StatusCode &gt;= 500
+        }</span>
+
+        <span class="cov0" title="0">return false</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package main
+
+import (
+        "context"
+        "fmt"
+        "log"
+        "os"
+        "os/signal"
+        "time"
+
+        "github.com/user/goaquatemp"
+)
+
+func main() <span class="cov0" title="0">{
+        client, err := goaquatemp.NewClient(
+                goaquatemp.WithEnvConfig(),
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("failed to create client: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+        defer cancel()
+
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("login failed: %v", err)
+        }</span>
+        <span class="cov0" title="0">defer client.Logout(ctx)
+
+        devices, err := client.GetDevices(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("failed to get devices: %v", err)
+        }</span>
+        <span class="cov0" title="0">if len(devices) == 0 </span><span class="cov0" title="0">{
+                log.Fatal("no devices found")
+        }</span>
+
+        <span class="cov0" title="0">deviceCode := devices[0].Code
+        fmt.Printf("Monitoring device: %s (%s)\n", devices[0].Name, deviceCode)
+        fmt.Println("Press Ctrl+C to stop")
+        fmt.Println()
+
+        ticker := time.NewTicker(5 * time.Minute)
+        defer ticker.Stop()
+
+        poll := func() </span><span class="cov0" title="0">{
+                data, err := client.GetDeviceData(ctx, deviceCode)
+                if err != nil </span><span class="cov0" title="0">{
+                        log.Printf("error: %v", err)
+                        return
+                }</span>
+
+                <span class="cov0" title="0">power := "OFF"
+                if data.Power </span><span class="cov0" title="0">{
+                        power = "ON"
+                }</span>
+
+                <span class="cov0" title="0">fmt.Printf("[%s] Power: %s  Mode: %s  Current: %.1fC  Target: %.1fC  Ambient: %.1fC\n",
+                        time.Now().Format("15:04:05"),
+                        power,
+                        data.Mode,
+                        data.CurrentTemp,
+                        data.TargetTemp,
+                        data.AmbientTemp,
+                )</span>
+        }
+
+        <span class="cov0" title="0">poll()
+
+        for </span><span class="cov0" title="0">{
+                select </span>{
+                case &lt;-ctx.Done():<span class="cov0" title="0">
+                        fmt.Println("\nStopped")
+                        return</span>
+                case &lt;-ticker.C:<span class="cov0" title="0">
+                        poll()</span>
+                }
+        }
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">// Example program that connects to the Aqua Temp API and retrieves
+// temperature data for the current day.
+package main
+
+import (
+        "context"
+        "fmt"
+        "log"
+        "os"
+        "time"
+
+        "github.com/user/goaquatemp"
+)
+
+func main() <span class="cov0" title="0">{
+        // Create client with configuration from environment variables
+        client, err := goaquatemp.NewClient(
+                goaquatemp.WithUsername(os.Getenv("AQUATEMP_USERNAME")),
+                goaquatemp.WithPassword(os.Getenv("AQUATEMP_PASSWORD")),
+                goaquatemp.WithAPIVersion(goaquatemp.APIModern),
+                goaquatemp.WithTimeout(30*time.Second),
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("Failed to create client: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">ctx := context.Background()
+
+        // Authenticate
+        fmt.Println("Authenticating...")
+        if err := client.Login(ctx); err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("Login failed: %v", err)
+        }</span>
+        <span class="cov0" title="0">defer client.Logout(ctx)
+        fmt.Println("Authentication successful!")
+
+        // Get list of devices
+        fmt.Println("\nFetching devices...")
+        devices, err := client.GetDevices(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("Failed to get devices: %v", err)
+        }</span>
+
+        <span class="cov0" title="0">if len(devices) == 0 </span><span class="cov0" title="0">{
+                log.Fatal("No devices found")
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("Found %d device(s)\n", len(devices))
+
+        // Get temperature data for first device (or specified device)
+        deviceCode := os.Getenv("AQUATEMP_DEFAULT_DEVICE")
+        var device goaquatemp.Device
+
+        if deviceCode != "" </span><span class="cov0" title="0">{
+                // Find the specified device
+                for _, d := range devices </span><span class="cov0" title="0">{
+                        if d.Code == deviceCode </span><span class="cov0" title="0">{
+                                device = d
+                                break</span>
+                        }
+                }
+                <span class="cov0" title="0">if device.Code == "" </span><span class="cov0" title="0">{
+                        log.Fatalf("Device %s not found", deviceCode)
+                }</span>
+        } else<span class="cov0" title="0"> {
+                // Use first device
+                device = devices[0]
+        }</span>
+
+        <span class="cov0" title="0">fmt.Printf("\nGetting temperature data for: %s (%s)\n", device.Name, device.Code)
+
+        data, err := client.GetDeviceData(ctx, device.Code)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatalf("Failed to get device data: %v", err)
+        }</span>
+
+        // Display temperature data
+        <span class="cov0" title="0">fmt.Println()
+        fmt.Println("=" + repeatStr("=", 39))
+        fmt.Printf(" Temperature Data - %s\n", time.Now().Format("2006-01-02"))
+        fmt.Println("=" + repeatStr("=", 39))
+        fmt.Println()
+
+        fmt.Printf(" Device:       %s\n", device.Name)
+        fmt.Printf(" Device Code:  %s\n", device.Code)
+        fmt.Printf(" Timestamp:    %s\n", data.Timestamp.Format(time.RFC3339))
+        fmt.Println()
+
+        // Status
+        fmt.Println(" Status")
+        fmt.Println(" " + repeatStr("-", 25))
+        fmt.Printf(" Power:        %s\n", formatPower(data.Power))
+        fmt.Printf(" Mode:         %s\n", data.Mode)
+        fmt.Printf(" Fan Speed:    %s\n", data.FanSpeed)
+
+        if data.ErrorCode != 0 </span><span class="cov0" title="0">{
+                fmt.Printf(" Error Code:   %d\n", data.ErrorCode)
+        }</span>
+        <span class="cov0" title="0">fmt.Println()
+
+        // Temperatures
+        fmt.Println(" Temperatures")
+        fmt.Println(" " + repeatStr("-", 25))
+        fmt.Printf(" Target:       %.1f°C\n", data.TargetTemp)
+        fmt.Printf(" Current:      %.1f°C\n", data.CurrentTemp)
+        fmt.Printf(" Inlet:        %.1f°C\n", data.InletTemp)
+        fmt.Printf(" Outlet:       %.1f°C\n", data.OutletTemp)
+        fmt.Printf(" Ambient:      %.1f°C\n", data.AmbientTemp)
+        fmt.Printf(" Coil:         %.1f°C\n", data.CoilTemp)
+        fmt.Println()
+
+        // Delta calculation
+        if data.InletTemp &gt; 0 &amp;&amp; data.OutletTemp &gt; 0 </span><span class="cov0" title="0">{
+                delta := data.OutletTemp - data.InletTemp
+                fmt.Printf(" Delta (Out-In): %.1f°C\n", delta)
+                fmt.Println()
+        }</span>
+
+        <span class="cov0" title="0">fmt.Println("=" + repeatStr("=", 39))</span>
+}
+
+func formatPower(on bool) string <span class="cov0" title="0">{
+        if on </span><span class="cov0" title="0">{
+                return "ON"
+        }</span>
+        <span class="cov0" title="0">return "OFF"</span>
+}
+
+func repeatStr(s string, count int) string <span class="cov0" title="0">{
+        result := ""
+        for i := 0; i &lt; count; i++ </span><span class="cov0" title="0">{
+                result += s
+        }</span>
+        <span class="cov0" title="0">return result</span>
+}
+</pre>
+		
+		<pre class="file" id="file9" style="display: none">package api
+
+// LoginRequest represents the login API request body.
+type LoginRequest struct {
+        UserName string `json:"user_name"`
+        Password string `json:"password"`
+        Type     string `json:"type"`
+}
+
+// NewLoginRequest creates a new login request.
+func NewLoginRequest(username, password string) *LoginRequest <span class="cov0" title="0">{
+        return &amp;LoginRequest{
+                UserName: username,
+                Password: password,
+                Type:     "2", // Mobile app type
+        }
+}</span>
+
+// DeviceListRequest represents the device list API request body.
+type DeviceListRequest struct {
+        ProductIDs []string `json:"productIds"`
+}
+
+// NewDeviceListRequest creates a new device list request.
+func NewDeviceListRequest() *DeviceListRequest <span class="cov0" title="0">{
+        return &amp;DeviceListRequest{
+                ProductIDs: []string{},
+        }
+}</span>
+
+// DeviceDataRequest represents the device data API request body.
+type DeviceDataRequest struct {
+        DeviceCode string   `json:"device_code"`
+        Protocols  []string `json:"protocal_codes"` // Note: API uses "protocal" (typo)
+}
+
+// NewDeviceDataRequest creates a new device data request.
+func NewDeviceDataRequest(deviceCode string) *DeviceDataRequest <span class="cov0" title="0">{
+        return &amp;DeviceDataRequest{
+                DeviceCode: deviceCode,
+                Protocols: []string{
+                        ParamPower,
+                        ParamMode,
+                        ParamTargetTemp,
+                        ParamCurrentTemp,
+                        ParamInletTemp,
+                        ParamOutletTemp,
+                        ParamAmbientTemp,
+                        ParamCoilTemp,
+                        ParamFanSpeed,
+                        ParamErrorCode,
+                },
+        }
+}</span>
+
+// ControlRequest represents the device control API request body.
+type ControlRequest struct {
+        DeviceCode   string `json:"device_code"`
+        ProtocolCode string `json:"protocal_code"` // Note: API uses "protocal" (typo)
+        Value        string `json:"value"`
+}
+
+// NewControlRequest creates a new control request.
+func NewControlRequest(deviceCode, protocolCode, value string) *ControlRequest <span class="cov0" title="0">{
+        return &amp;ControlRequest{
+                DeviceCode:   deviceCode,
+                ProtocolCode: protocolCode,
+                Value:        value,
+        }
+}</span>
+
+// ControlValue represents a single control parameter.
+type ControlValue struct {
+        ProtocolCode string `json:"protocal_code"`
+        Value        string `json:"value"`
+}
+
+// MultiControlRequest represents a multi-parameter control request.
+type MultiControlRequest struct {
+        DeviceCode string         `json:"device_code"`
+        Values     []ControlValue `json:"value"`
+}
+
+// NewMultiControlRequest creates a new multi-control request.
+func NewMultiControlRequest(deviceCode string, values []ControlValue) *MultiControlRequest <span class="cov0" title="0">{
+        return &amp;MultiControlRequest{
+                DeviceCode: deviceCode,
+                Values:     values,
+        }
+}</span>
+</pre>
+		
+		<pre class="file" id="file10" style="display: none">package api
+
+import (
+        "strconv"
+        "time"
+)
+
+// BaseResponse represents the common response structure from the API.
+type BaseResponse struct {
+        ErrorCode    int    `json:"error_code"`
+        ErrorMessage string `json:"error_msg"`
+}
+
+// IsSuccess returns true if the response indicates success.
+func (r *BaseResponse) IsSuccess() bool <span class="cov8" title="1">{
+        return r.ErrorCode == 0
+}</span>
+
+// LoginResponse represents the login API response.
+type LoginResponse struct {
+        BaseResponse
+        ObjectResult *LoginResult `json:"objectResult"`
+}
+
+// LoginResult contains the authentication result data.
+type LoginResult struct {
+        Token     string `json:"x-token"`
+        UserID    string `json:"userId"`
+        ExpiresIn int    `json:"expiresIn"`
+}
+
+// DeviceListResponse represents the device list API response.
+type DeviceListResponse struct {
+        BaseResponse
+        ObjectResult []DeviceInfo `json:"objectResult"`
+}
+
+// DeviceInfo represents a device in the device list.
+type DeviceInfo struct {
+        DeviceCode   string `json:"device_code"`
+        DeviceNick   string `json:"device_nick"`
+        DeviceType   string `json:"device_type"`
+        OnlineStatus string `json:"online_status"`
+        ProductCode  string `json:"product_code"`
+        CreateTime   string `json:"create_time"`
+}
+
+// IsOnline returns true if the device is online.
+func (d *DeviceInfo) IsOnline() bool <span class="cov8" title="1">{
+        return d.OnlineStatus == "1"
+}</span>
+
+// ParsedCreateTime returns the parsed creation time.
+func (d *DeviceInfo) ParsedCreateTime() time.Time <span class="cov8" title="1">{
+        t, _ := time.Parse("2006-01-02 15:04:05", d.CreateTime)
+        return t
+}</span>
+
+// DeviceDataResponse represents the device data API response.
+type DeviceDataResponse struct {
+        BaseResponse
+        ObjectResult []Parameter `json:"objectResult"`
+}
+
+// Parameter represents a single device parameter.
+type Parameter struct {
+        Code  string `json:"protocal_code"`
+        Value string `json:"value"`
+}
+
+// ControlResponse represents the control API response.
+type ControlResponse struct {
+        BaseResponse
+}
+
+// ParsedDeviceData holds the parsed device data values.
+type ParsedDeviceData struct {
+        Power       bool
+        Mode        string
+        TargetTemp  float64
+        CurrentTemp float64
+        InletTemp   float64
+        OutletTemp  float64
+        AmbientTemp float64
+        CoilTemp    float64
+        FanSpeed    string
+        ErrorCode   int
+        RawParams   map[string]string
+}
+
+// ParseDeviceData parses the device data response into structured data.
+func (r *DeviceDataResponse) ParseDeviceData() *ParsedDeviceData <span class="cov8" title="1">{
+        data := &amp;ParsedDeviceData{
+                RawParams: make(map[string]string),
+        }
+
+        for _, p := range r.ObjectResult </span><span class="cov8" title="1">{
+                data.RawParams[p.Code] = p.Value
+
+                switch p.Code </span>{
+                case ParamPower:<span class="cov8" title="1">
+                        data.Power = p.Value == APIPowerOn</span>
+                case ParamMode:<span class="cov8" title="1">
+                        data.Mode = p.Value</span>
+                case ParamTargetTemp:<span class="cov8" title="1">
+                        data.TargetTemp = parseFloat(p.Value)</span>
+                case ParamCurrentTemp:<span class="cov8" title="1">
+                        data.CurrentTemp = parseFloat(p.Value)</span>
+                case ParamInletTemp:<span class="cov8" title="1">
+                        data.InletTemp = parseFloat(p.Value)</span>
+                case ParamOutletTemp:<span class="cov8" title="1">
+                        data.OutletTemp = parseFloat(p.Value)</span>
+                case ParamAmbientTemp:<span class="cov8" title="1">
+                        data.AmbientTemp = parseFloat(p.Value)</span>
+                case ParamCoilTemp:<span class="cov8" title="1">
+                        data.CoilTemp = parseFloat(p.Value)</span>
+                case ParamFanSpeed:<span class="cov8" title="1">
+                        data.FanSpeed = p.Value</span>
+                case ParamErrorCode:<span class="cov8" title="1">
+                        data.ErrorCode = parseInt(p.Value)</span>
+                }
+        }
+
+        <span class="cov8" title="1">return data</span>
+}
+
+func parseFloat(value string) float64 <span class="cov8" title="1">{
+        f, _ := strconv.ParseFloat(value, 64)
+        return f
+}</span>
+
+func parseInt(value string) int <span class="cov8" title="1">{
+        i, _ := strconv.Atoi(value)
+        return i
+}</span>
+</pre>
+		
+		<pre class="file" id="file11" style="display: none">package auth
+
+import (
+        "context"
+        "crypto/md5"
+        "encoding/hex"
+        "encoding/json"
+        "fmt"
+        "strings"
+        "time"
+
+        "github.com/user/goaquatemp/internal/api"
+        "github.com/user/goaquatemp/internal/transport"
+)
+
+// APIVersion represents the API version for password handling.
+type APIVersion string
+
+const (
+        APIModern APIVersion = "modern"
+)
+
+// AuthError represents an authentication error.
+type AuthError struct {
+        Code      int
+        Message   string
+        Retryable bool
+        Err       error
+}
+
+func (e *AuthError) Error() string <span class="cov0" title="0">{
+        if e.Err != nil </span><span class="cov0" title="0">{
+                return fmt.Sprintf("auth error %d: %s: %v", e.Code, e.Message, e.Err)
+        }</span>
+        <span class="cov0" title="0">return fmt.Sprintf("auth error %d: %s", e.Code, e.Message)</span>
+}
+
+func (e *AuthError) Unwrap() error <span class="cov0" title="0">{
+        return e.Err
+}</span>
+
+// AuthManager defines the interface for authentication operations.
+type AuthManager interface {
+        Authenticate(ctx context.Context) (*Token, error)
+        RefreshToken(ctx context.Context) (*Token, error)
+        GetToken() *Token
+        GetTokenValue() string
+        IsAuthenticated() bool
+        Clear()
+        EnsureAuthenticated(ctx context.Context) error
+        FormatTokenHeader() string
+}
+
+var _ AuthManager = (*Manager)(nil)
+
+// Manager handles authentication with the Aqua Temp API.
+type Manager struct {
+        store      *TokenStore
+        http       transport.HTTPClient
+        apiVersion APIVersion
+        username   string
+        password   string
+}
+
+// NewManager creates a new authentication manager.
+func NewManager(http transport.HTTPClient, apiVersion string, username, password string) *Manager <span class="cov0" title="0">{
+        return &amp;Manager{
+                store:      NewTokenStore(),
+                http:       http,
+                apiVersion: APIVersion(apiVersion),
+                username:   username,
+                password:   password,
+        }
+}</span>
+
+// Authenticate performs authentication and stores the token.
+func (m *Manager) Authenticate(ctx context.Context) (*Token, error) <span class="cov0" title="0">{
+        password := m.preparePassword()
+
+        req := api.NewLoginRequest(m.username, password)
+
+        body, err := m.http.Post(ctx, api.EndpointLogin, req, "")
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, &amp;AuthError{
+                        Code:      -1,
+                        Message:   "failed to send login request",
+                        Retryable: true,
+                        Err:       err,
+                }
+        }</span>
+
+        <span class="cov0" title="0">var resp api.LoginResponse
+        if err := json.Unmarshal(body, &amp;resp); err != nil </span><span class="cov0" title="0">{
+                return nil, &amp;AuthError{
+                        Code:      -1,
+                        Message:   "failed to parse login response",
+                        Retryable: false,
+                        Err:       err,
+                }
+        }</span>
+
+        <span class="cov0" title="0">if !resp.IsSuccess() </span><span class="cov0" title="0">{
+                retryable := resp.ErrorCode &gt;= 500
+                return nil, &amp;AuthError{
+                        Code:      resp.ErrorCode,
+                        Message:   resp.ErrorMessage,
+                        Retryable: retryable,
+                }
+        }</span>
+
+        <span class="cov0" title="0">if resp.ObjectResult == nil || resp.ObjectResult.Token == "" </span><span class="cov0" title="0">{
+                return nil, &amp;AuthError{
+                        Code:    -1,
+                        Message: "no token in response",
+                }
+        }</span>
+
+        <span class="cov0" title="0">expiresIn := resp.ObjectResult.ExpiresIn
+        if expiresIn &lt;= 0 </span><span class="cov0" title="0">{
+                expiresIn = 3600 // Default to 1 hour
+        }</span>
+
+        <span class="cov0" title="0">token := &amp;Token{
+                Value:     resp.ObjectResult.Token,
+                UserID:    resp.ObjectResult.UserID,
+                ExpiresAt: time.Now().Add(time.Duration(expiresIn) * time.Second),
+        }
+
+        m.store.Set(token)
+        return token, nil</span>
+}
+
+// RefreshToken refreshes the authentication token.
+func (m *Manager) RefreshToken(ctx context.Context) (*Token, error) <span class="cov0" title="0">{
+        // The Aqua Temp API doesn't have a refresh endpoint,
+        // so we just re-authenticate.
+        return m.Authenticate(ctx)
+}</span>
+
+// GetToken returns the current token.
+func (m *Manager) GetToken() *Token <span class="cov0" title="0">{
+        return m.store.Get()
+}</span>
+
+// GetTokenValue returns the current token value string.
+func (m *Manager) GetTokenValue() string <span class="cov8" title="1">{
+        token := m.store.Get()
+        if token == nil </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+        <span class="cov8" title="1">return token.Value</span>
+}
+
+// IsAuthenticated returns true if we have a valid token.
+func (m *Manager) IsAuthenticated() bool <span class="cov8" title="1">{
+        return m.store.IsValid()
+}</span>
+
+// Clear removes the stored token.
+func (m *Manager) Clear() <span class="cov8" title="1">{
+        m.store.Clear()
+}</span>
+
+// EnsureAuthenticated ensures we have a valid token, refreshing if needed.
+func (m *Manager) EnsureAuthenticated(ctx context.Context) error <span class="cov0" title="0">{
+        if m.IsAuthenticated() </span><span class="cov0" title="0">{
+                return nil
+        }</span>
+
+        <span class="cov0" title="0">_, err := m.RefreshToken(ctx)
+        return err</span>
+}
+
+// preparePassword prepares the password for the API.
+// Modern API (v1.5.9+) requires MD5 hashed password.
+func (m *Manager) preparePassword() string <span class="cov8" title="1">{
+        if m.apiVersion == APIModern </span><span class="cov8" title="1">{
+                return md5Hash(m.password)
+        }</span>
+        <span class="cov8" title="1">return m.password</span>
+}
+
+// md5Hash returns the MD5 hash of a string as a lowercase hex string.
+func md5Hash(s string) string <span class="cov8" title="1">{
+        hash := md5.Sum([]byte(s))
+        return strings.ToLower(hex.EncodeToString(hash[:]))
+}</span>
+
+// FormatTokenHeader returns the token formatted for the x-token header.
+func (m *Manager) FormatTokenHeader() string <span class="cov8" title="1">{
+        token := m.GetTokenValue()
+        if token == "" </span><span class="cov8" title="1">{
+                return ""
+        }</span>
+        <span class="cov8" title="1">return fmt.Sprintf("bearer %s", token)</span>
+}
+</pre>
+		
+		<pre class="file" id="file12" style="display: none">package auth
+
+import (
+        "sync"
+        "time"
+)
+
+// Token represents an authentication token.
+type Token struct {
+        Value     string
+        UserID    string
+        ExpiresAt time.Time
+}
+
+// IsValid returns true if the token is set and not expired.
+func (t *Token) IsValid() bool <span class="cov8" title="1">{
+        if t == nil || t.Value == "" </span><span class="cov8" title="1">{
+                return false
+        }</span>
+        // Add a buffer of 60 seconds before actual expiry
+        <span class="cov8" title="1">return time.Now().Add(60 * time.Second).Before(t.ExpiresAt)</span>
+}
+
+// IsExpired returns true if the token has expired.
+func (t *Token) IsExpired() bool <span class="cov0" title="0">{
+        if t == nil </span><span class="cov0" title="0">{
+                return true
+        }</span>
+        <span class="cov0" title="0">return time.Now().After(t.ExpiresAt)</span>
+}
+
+// TokenStore provides thread-safe storage for authentication tokens.
+type TokenStore struct {
+        mu    sync.RWMutex
+        token *Token
+}
+
+// NewTokenStore creates a new TokenStore.
+func NewTokenStore() *TokenStore <span class="cov8" title="1">{
+        return &amp;TokenStore{}
+}</span>
+
+// Set stores a token.
+func (s *TokenStore) Set(token *Token) <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        s.token = token
+}</span>
+
+// Get returns the current token.
+func (s *TokenStore) Get() *Token <span class="cov8" title="1">{
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+        return s.token
+}</span>
+
+// Clear removes the stored token.
+func (s *TokenStore) Clear() <span class="cov8" title="1">{
+        s.mu.Lock()
+        defer s.mu.Unlock()
+        s.token = nil
+}</span>
+
+// IsValid returns true if the stored token is valid.
+func (s *TokenStore) IsValid() bool <span class="cov8" title="1">{
+        s.mu.RLock()
+        defer s.mu.RUnlock()
+        return s.token.IsValid()
+}</span>
+</pre>
+		
+		<pre class="file" id="file13" style="display: none">package testutil
+
+import (
+        "encoding/json"
+        "net/http"
+        "net/http/httptest"
+        "sync"
+)
+
+// FakeServer simulates the Aqua Temp API for testing.
+type FakeServer struct {
+        Server     *httptest.Server
+        Token      string
+        Username   string
+        Password   string
+        Devices    []DeviceInfo
+        DeviceData map[string][]Parameter
+
+        mu             sync.Mutex
+        LoginCount     int
+        ControlCalls   []ControlCall
+        FailLogin      bool
+        FailNextNPosts int
+}
+
+// DeviceInfo matches the API device list response structure.
+type DeviceInfo struct {
+        DeviceCode   string `json:"device_code"`
+        DeviceNick   string `json:"device_nick"`
+        DeviceType   string `json:"device_type"`
+        OnlineStatus string `json:"online_status"`
+        ProductCode  string `json:"product_code"`
+        CreateTime   string `json:"create_time"`
+}
+
+// Parameter matches the API device data response structure.
+type Parameter struct {
+        Code  string `json:"protocal_code"`
+        Value string `json:"value"`
+}
+
+// ControlCall records a control request for verification.
+type ControlCall struct {
+        DeviceCode   string
+        ProtocolCode string
+        Value        string
+}
+
+// NewFakeServer creates and starts a new fake Aqua Temp API server.
+func NewFakeServer() *FakeServer <span class="cov0" title="0">{
+        f := &amp;FakeServer{
+                Token:      "fake-token-12345",
+                Username:   "test@example.com",
+                Password:   "testpass",
+                DeviceData: make(map[string][]Parameter),
+        }
+
+        mux := http.NewServeMux()
+        mux.HandleFunc("/app/user/login.json", f.handleLogin)
+        mux.HandleFunc("/app/device/deviceList.json", f.handleDeviceList)
+        mux.HandleFunc("/app/device/getDataByCode.json", f.handleDeviceData)
+        mux.HandleFunc("/app/device/control.json", f.handleControl)
+
+        f.Server = httptest.NewServer(mux)
+        return f
+}</span>
+
+// Close shuts down the fake server.
+func (f *FakeServer) Close() <span class="cov0" title="0">{
+        f.Server.Close()
+}</span>
+
+// URL returns the server's base URL.
+func (f *FakeServer) URL() string <span class="cov0" title="0">{
+        return f.Server.URL
+}</span>
+
+func (f *FakeServer) handleLogin(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        f.mu.Lock()
+        f.LoginCount++
+        failLogin := f.FailLogin
+        f.mu.Unlock()
+
+        if r.Method != http.MethodPost </span><span class="cov0" title="0">{
+                writeError(w, 405, "method not allowed")
+                return
+        }</span>
+
+        <span class="cov0" title="0">var req struct {
+                UserName string `json:"user_name"`
+                Password string `json:"password"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
+                writeError(w, -1, "invalid request body")
+                return
+        }</span>
+
+        <span class="cov0" title="0">if failLogin || req.UserName != f.Username || req.Password != f.Password </span><span class="cov0" title="0">{
+                writeJSON(w, map[string]any{
+                        "error_code": 401,
+                        "error_msg":  "invalid credentials",
+                })
+                return
+        }</span>
+
+        <span class="cov0" title="0">writeJSON(w, map[string]any{
+                "error_code": 0,
+                "error_msg":  "",
+                "objectResult": map[string]any{
+                        "x-token":   f.Token,
+                        "userId":    "user-123",
+                        "expiresIn": 3600,
+                },
+        })</span>
+}
+
+func (f *FakeServer) handleDeviceList(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        if !f.checkToken(w, r) </span><span class="cov0" title="0">{
+                return
+        }</span>
+
+        <span class="cov0" title="0">if f.checkServerError(w) </span><span class="cov0" title="0">{
+                return
+        }</span>
+
+        <span class="cov0" title="0">writeJSON(w, map[string]any{
+                "error_code":   0,
+                "error_msg":    "",
+                "objectResult": f.Devices,
+        })</span>
+}
+
+func (f *FakeServer) handleDeviceData(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        if !f.checkToken(w, r) </span><span class="cov0" title="0">{
+                return
+        }</span>
+
+        <span class="cov0" title="0">var req struct {
+                DeviceCode string `json:"device_code"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
+                writeError(w, -1, "invalid request body")
+                return
+        }</span>
+
+        <span class="cov0" title="0">params, ok := f.DeviceData[req.DeviceCode]
+        if !ok </span><span class="cov0" title="0">{
+                writeJSON(w, map[string]any{
+                        "error_code":   0,
+                        "error_msg":    "",
+                        "objectResult": []any{},
+                })
+                return
+        }</span>
+
+        <span class="cov0" title="0">writeJSON(w, map[string]any{
+                "error_code":   0,
+                "error_msg":    "",
+                "objectResult": params,
+        })</span>
+}
+
+func (f *FakeServer) handleControl(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        if !f.checkToken(w, r) </span><span class="cov0" title="0">{
+                return
+        }</span>
+
+        <span class="cov0" title="0">var req struct {
+                DeviceCode   string `json:"device_code"`
+                ProtocolCode string `json:"protocal_code"`
+                Value        string `json:"value"`
+        }
+        if err := json.NewDecoder(r.Body).Decode(&amp;req); err != nil </span><span class="cov0" title="0">{
+                writeError(w, -1, "invalid request body")
+                return
+        }</span>
+
+        <span class="cov0" title="0">f.mu.Lock()
+        f.ControlCalls = append(f.ControlCalls, ControlCall{
+                DeviceCode:   req.DeviceCode,
+                ProtocolCode: req.ProtocolCode,
+                Value:        req.Value,
+        })
+        f.mu.Unlock()
+
+        writeJSON(w, map[string]any{
+                "error_code": 0,
+                "error_msg":  "",
+        })</span>
+}
+
+func (f *FakeServer) checkToken(w http.ResponseWriter, r *http.Request) bool <span class="cov0" title="0">{
+        token := r.Header.Get("x-token")
+        if token == "" || token != "bearer "+f.Token </span><span class="cov0" title="0">{
+                writeJSON(w, map[string]any{
+                        "error_code": 401,
+                        "error_msg":  "token invalid or expired",
+                })
+                return false
+        }</span>
+        <span class="cov0" title="0">return true</span>
+}
+
+func (f *FakeServer) checkServerError(w http.ResponseWriter) bool <span class="cov0" title="0">{
+        f.mu.Lock()
+        defer f.mu.Unlock()
+
+        if f.FailNextNPosts &gt; 0 </span><span class="cov0" title="0">{
+                f.FailNextNPosts--
+                w.WriteHeader(http.StatusInternalServerError)
+                return true
+        }</span>
+        <span class="cov0" title="0">return false</span>
+}
+
+func writeJSON(w http.ResponseWriter, data any) <span class="cov0" title="0">{
+        w.Header().Set("Content-Type", "application/json")
+        json.NewEncoder(w).Encode(data)
+}</span>
+
+func writeError(w http.ResponseWriter, code int, message string) <span class="cov0" title="0">{
+        writeJSON(w, map[string]any{
+                "error_code": code,
+                "error_msg":  message,
+        })
+}</span>
+</pre>
+		
+		<pre class="file" id="file14" style="display: none">package transport
+
+import (
+        "bytes"
+        "context"
+        "encoding/json"
+        "fmt"
+        "io"
+        "log"
+        "net/http"
+        "time"
+)
+
+// HTTPError represents an HTTP-level error.
+type HTTPError struct {
+        StatusCode int
+        Message    string
+}
+
+func (e *HTTPError) Error() string <span class="cov8" title="1">{
+        return fmt.Sprintf("http error %d: %s", e.StatusCode, e.Message)
+}</span>
+
+// HTTPClient defines the interface for making HTTP requests to the API.
+type HTTPClient interface {
+        Post(ctx context.Context, endpoint string, body any, token string) ([]byte, error)
+        Get(ctx context.Context, endpoint string, token string) ([]byte, error)
+        SetBaseURL(baseURL string)
+}
+
+var _ HTTPClient = (*Client)(nil)
+
+// Client wraps the HTTP client for API requests.
+type Client struct {
+        baseURL    string
+        httpClient *http.Client
+        debug      bool
+        retryCount int
+}
+
+// NewClient creates a new HTTP transport client.
+func NewClient(baseURL string, timeout time.Duration, retryCount int, debug bool) *Client <span class="cov8" title="1">{
+        return &amp;Client{
+                baseURL: baseURL,
+                httpClient: &amp;http.Client{
+                        Timeout: timeout,
+                },
+                debug:      debug,
+                retryCount: retryCount,
+        }
+}</span>
+
+// Post sends a POST request to the API.
+func (c *Client) Post(ctx context.Context, endpoint string, body any, token string) ([]byte, error) <span class="cov8" title="1">{
+        return c.doRequest(ctx, http.MethodPost, endpoint, body, token)
+}</span>
+
+// Get sends a GET request to the API.
+func (c *Client) Get(ctx context.Context, endpoint string, token string) ([]byte, error) <span class="cov8" title="1">{
+        return c.doRequest(ctx, http.MethodGet, endpoint, nil, token)
+}</span>
+
+func (c *Client) doRequest(ctx context.Context, method, endpoint string, body any, token string) ([]byte, error) <span class="cov8" title="1">{
+        url := c.baseURL + endpoint
+
+        var bodyReader io.Reader
+        if body != nil </span><span class="cov8" title="1">{
+                jsonBody, err := json.Marshal(body)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to marshal request body: %w", err)
+                }</span>
+                <span class="cov8" title="1">bodyReader = bytes.NewReader(jsonBody)
+
+                if c.debug </span><span class="cov0" title="0">{
+                        log.Printf("[DEBUG] Request: %s %s\n%s", method, url, string(jsonBody))
+                }</span>
+        }
+
+        <span class="cov8" title="1">var lastErr error
+        for attempt := 0; attempt &lt;= c.retryCount; attempt++ </span><span class="cov8" title="1">{
+                if attempt &gt; 0 </span><span class="cov8" title="1">{
+                        // Exponential backoff
+                        backoff := time.Duration(attempt*attempt) * 100 * time.Millisecond
+                        select </span>{
+                        case &lt;-ctx.Done():<span class="cov0" title="0">
+                                return nil, ctx.Err()</span>
+                        case &lt;-time.After(backoff):<span class="cov8" title="1"></span>
+                        }
+
+                        // Re-create body reader for retry
+                        <span class="cov8" title="1">if body != nil </span><span class="cov0" title="0">{
+                                jsonBody, _ := json.Marshal(body)
+                                bodyReader = bytes.NewReader(jsonBody)
+                        }</span>
+                }
+
+                <span class="cov8" title="1">req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("failed to create request: %w", err)
+                }</span>
+
+                <span class="cov8" title="1">req.Header.Set("Content-Type", "application/json")
+                req.Header.Set("Accept", "application/json")
+                req.Header.Set("User-Agent", "AquaTemp-Go/1.0")
+
+                if token != "" </span><span class="cov8" title="1">{
+                        req.Header.Set("x-token", token)
+                }</span>
+
+                <span class="cov8" title="1">resp, err := c.httpClient.Do(req)
+                if err != nil </span><span class="cov8" title="1">{
+                        lastErr = err
+                        if c.debug </span><span class="cov0" title="0">{
+                                log.Printf("[DEBUG] Request failed (attempt %d): %v", attempt+1, err)
+                        }</span>
+                        <span class="cov8" title="1">continue</span>
+                }
+
+                <span class="cov8" title="1">respBody, err := io.ReadAll(resp.Body)
+                resp.Body.Close()
+
+                if err != nil </span><span class="cov0" title="0">{
+                        lastErr = err
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">if c.debug </span><span class="cov0" title="0">{
+                        log.Printf("[DEBUG] Response (%d): %s", resp.StatusCode, string(respBody))
+                }</span>
+
+                <span class="cov8" title="1">if resp.StatusCode &gt;= 500 </span><span class="cov8" title="1">{
+                        lastErr = &amp;HTTPError{
+                                StatusCode: resp.StatusCode,
+                                Message:    fmt.Sprintf("server error: %s", http.StatusText(resp.StatusCode)),
+                        }
+                        continue</span>
+                }
+
+                <span class="cov8" title="1">if resp.StatusCode &gt;= 400 </span><span class="cov8" title="1">{
+                        return nil, &amp;HTTPError{
+                                StatusCode: resp.StatusCode,
+                                Message:    fmt.Sprintf("client error: %s", http.StatusText(resp.StatusCode)),
+                        }
+                }</span>
+
+                <span class="cov8" title="1">return respBody, nil</span>
+        }
+
+        <span class="cov8" title="1">if lastErr != nil </span><span class="cov8" title="1">{
+                return nil, fmt.Errorf("request failed after %d attempts: %w", c.retryCount+1, lastErr)
+        }</span>
+
+        <span class="cov0" title="0">return nil, fmt.Errorf("request failed")</span>
+}
+
+// SetBaseURL updates the base URL.
+func (c *Client) SetBaseURL(baseURL string) <span class="cov8" title="1">{
+        c.baseURL = baseURL
+}</span>
+</pre>
+		
+		<pre class="file" id="file15" style="display: none">package goaquatemp
+
+import "time"
+
+// Option is a functional option for configuring a Client.
+type Option func(*Config)
+
+// WithUsername sets the username for authentication.
+func WithUsername(username string) Option <span class="cov8" title="1">{
+        return func(c *Config) </span><span class="cov8" title="1">{
+                c.Username = username
+        }</span>
+}
+
+// WithPassword sets the password for authentication.
+func WithPassword(password string) Option <span class="cov8" title="1">{
+        return func(c *Config) </span><span class="cov8" title="1">{
+                c.Password = password
+        }</span>
+}
+
+// WithAPIVersion sets the API version to use.
+func WithAPIVersion(version APIVersion) Option <span class="cov8" title="1">{
+        return func(c *Config) </span><span class="cov8" title="1">{
+                c.APIVersion = version
+        }</span>
+}
+
+// WithBaseURL overrides the default base URL for the API.
+func WithBaseURL(url string) Option <span class="cov8" title="1">{
+        return func(c *Config) </span><span class="cov8" title="1">{
+                c.BaseURL = url
+        }</span>
+}
+
+// WithTimeout sets the HTTP request timeout.
+func WithTimeout(timeout time.Duration) Option <span class="cov8" title="1">{
+        return func(c *Config) </span><span class="cov8" title="1">{
+                c.Timeout = timeout
+        }</span>
+}
+
+// WithRetryCount sets the number of retry attempts for failed requests.
+func WithRetryCount(count int) Option <span class="cov8" title="1">{
+        return func(c *Config) </span><span class="cov8" title="1">{
+                c.RetryCount = count
+        }</span>
+}
+
+// WithDebug enables debug logging.
+func WithDebug(debug bool) Option <span class="cov8" title="1">{
+        return func(c *Config) </span><span class="cov8" title="1">{
+                c.Debug = debug
+        }</span>
+}
+
+// WithDefaultDevice sets the default device code.
+func WithDefaultDevice(deviceCode string) Option <span class="cov8" title="1">{
+        return func(c *Config) </span><span class="cov8" title="1">{
+                c.DefaultDevice = deviceCode
+        }</span>
+}
+
+// WithConfig applies an existing Config.
+func WithConfig(cfg *Config) Option <span class="cov8" title="1">{
+        return func(c *Config) </span><span class="cov8" title="1">{
+                if cfg.Username != "" </span><span class="cov0" title="0">{
+                        c.Username = cfg.Username
+                }</span>
+                <span class="cov8" title="1">if cfg.Password != "" </span><span class="cov0" title="0">{
+                        c.Password = cfg.Password
+                }</span>
+                <span class="cov8" title="1">if cfg.APIVersion != "" </span><span class="cov8" title="1">{
+                        c.APIVersion = cfg.APIVersion
+                }</span>
+                <span class="cov8" title="1">if cfg.BaseURL != "" </span><span class="cov0" title="0">{
+                        c.BaseURL = cfg.BaseURL
+                }</span>
+                <span class="cov8" title="1">if cfg.Timeout &gt; 0 </span><span class="cov8" title="1">{
+                        c.Timeout = cfg.Timeout
+                }</span>
+                <span class="cov8" title="1">if cfg.RetryCount &gt; 0 </span><span class="cov8" title="1">{
+                        c.RetryCount = cfg.RetryCount
+                }</span>
+                <span class="cov8" title="1">c.Debug = cfg.Debug
+                if cfg.DefaultDevice != "" </span><span class="cov0" title="0">{
+                        c.DefaultDevice = cfg.DefaultDevice
+                }</span>
+        }
+}
+
+// WithConfigFile loads configuration from a file and applies it.
+func WithConfigFile(path string) Option <span class="cov0" title="0">{
+        return func(c *Config) </span><span class="cov0" title="0">{
+                cfg, err := LoadConfigFile(path)
+                if err != nil </span><span class="cov0" title="0">{
+                        return // Silently ignore file load errors
+                }</span>
+                <span class="cov0" title="0">WithConfig(cfg)(c)</span>
+        }
+}
+
+// WithEnvConfig loads configuration from environment variables.
+func WithEnvConfig() Option <span class="cov0" title="0">{
+        return func(c *Config) </span><span class="cov0" title="0">{
+                cfg := LoadConfigFromEnv()
+                WithConfig(cfg)(c)
+        }</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
