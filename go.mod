@@ -1,4 +1,4 @@
-module github.com/user/goaquatemp
+module github.com/emergingrobotics/goaquatemp
 
 go 1.21
 

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/user/goaquatemp/internal/api"
-	"github.com/user/goaquatemp/internal/transport"
+	"github.com/emergingrobotics/goaquatemp/internal/api"
+	"github.com/emergingrobotics/goaquatemp/internal/transport"
 )
 
 // APIVersion is the API version name (legacy, hitemp, modern).

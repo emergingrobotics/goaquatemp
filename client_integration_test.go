@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/user/goaquatemp/internal/testutil"
+	"github.com/emergingrobotics/goaquatemp/internal/testutil"
 )
 
 func setupIntegrationTest(t *testing.T) (*testutil.FakeServer, Client) {

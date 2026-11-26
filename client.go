@@ -9,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/user/goaquatemp/internal/api"
-	"github.com/user/goaquatemp/internal/auth"
-	"github.com/user/goaquatemp/internal/transport"
+	"github.com/emergingrobotics/goaquatemp/internal/api"
+	"github.com/emergingrobotics/goaquatemp/internal/auth"
+	"github.com/emergingrobotics/goaquatemp/internal/transport"
 )
 
 // Client provides methods for interacting with the Aqua Temp API.

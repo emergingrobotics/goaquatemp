@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/user/goaquatemp/internal/api"
-	"github.com/user/goaquatemp/internal/testutil"
+	"github.com/emergingrobotics/goaquatemp/internal/api"
+	"github.com/emergingrobotics/goaquatemp/internal/testutil"
 )
 
 var pst = time.FixedZone("PST", -8*3600)

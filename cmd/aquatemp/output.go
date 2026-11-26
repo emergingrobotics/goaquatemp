@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/user/goaquatemp"
+	"github.com/emergingrobotics/goaquatemp"
 )
 
 func printJSON(v any) error {

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/user/goaquatemp"
+	"github.com/emergingrobotics/goaquatemp"
 )
 
 func TestVersionCmd(t *testing.T) {

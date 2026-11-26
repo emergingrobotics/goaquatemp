@@ -21,13 +21,13 @@ goaquatemp provides programmatic access to Aqua Temp heat pumps via their cloud 
 ### As a library
 
 ```bash
-go get github.com/user/goaquatemp
+go get github.com/emergingrobotics/goaquatemp
 ```
 
 ### CLI tool
 
 ```bash
-go install github.com/user/goaquatemp/cmd/aquatemp@latest
+go install github.com/emergingrobotics/goaquatemp/cmd/aquatemp@latest
 ```
 
 ## Quick Start
@@ -44,7 +44,7 @@ import (
     "os"
     "time"
 
-    "github.com/user/goaquatemp"
+    "github.com/emergingrobotics/goaquatemp"
 )
 
 func main() {

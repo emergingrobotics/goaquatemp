@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/user/goaquatemp"
+	"github.com/emergingrobotics/goaquatemp"
 )
 
 func TestParseSince(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/user/goaquatemp"
+	"github.com/emergingrobotics/goaquatemp"
 )
 
 func main() {

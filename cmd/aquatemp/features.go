@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"github.com/user/goaquatemp"
+	"github.com/emergingrobotics/goaquatemp"
 )
 
 // status command
