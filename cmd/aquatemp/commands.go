@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -36,12 +38,24 @@ func getDeviceCode(client goaquatemp.Client) string {
 	return ""
 }
 
+// requireDeviceCode returns the configured device code or, when none is
+// configured, the account's first device.
 func requireDeviceCode(client goaquatemp.Client) (string, error) {
-	code := getDeviceCode(client)
-	if code == "" {
-		return "", fmt.Errorf("device code required: use --device flag or set AQUATEMP_DEFAULT_DEVICE")
+	if code := getDeviceCode(client); code != "" {
+		return code, nil
 	}
-	return code, nil
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	devices, err := client.GetDevices(ctx)
+	if err != nil {
+		return "", fmt.Errorf("no --device given and listing devices failed: %w", err)
+	}
+	if len(devices) == 0 {
+		return "", fmt.Errorf("no devices found on this account: use --device or set AQUATEMP_DEFAULT_DEVICE")
+	}
+	return devices[0].Code, nil
 }
 
 // login command
@@ -167,7 +181,7 @@ func newTempCmd() *cobra.Command {
 	var interval int
 	historyCmd := &cobra.Command{
 		Use:   "history",
-		Short: "Poll temperature data over time",
+		Short: "Poll live temperature data over time (see 'aquatemp history' for recorded data)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runTempHistory(hours, interval)
 		},
@@ -236,7 +250,8 @@ func runTempHistory(hours, interval int) error {
 	defer ticker.Stop()
 
 	if outputCSV {
-		fmt.Println("timestamp,target,current,inlet,outlet,ambient")
+		fmt.Println("timestamp,target_c,target_f,current_c,current_f,inlet_c,inlet_f,outlet_c,outlet_f,ambient_c,ambient_f," +
+			"water_temp_status,current_raw_c,inlet_raw_c,outlet_raw_c")
 	}
 
 	readAndPrint := func() {
@@ -250,28 +265,38 @@ func runTempHistory(hours, interval int) error {
 			printJSON(map[string]any{
 				"timestamp": now,
 				"target":    data.TargetTemp,
-				"current":   data.CurrentTemp,
-				"inlet":     data.InletTemp,
-				"outlet":    data.OutletTemp,
+				"current":   waterTempJSON(data, data.CurrentTemp),
+				"inlet":     waterTempJSON(data, data.InletTemp),
+				"outlet":    waterTempJSON(data, data.OutletTemp),
 				"ambient":   data.AmbientTemp,
+				"target_f":  goaquatemp.CelsiusToFahrenheit(data.TargetTemp),
+				"current_f": waterTempJSON(data, goaquatemp.CelsiusToFahrenheit(data.CurrentTemp)),
+				"inlet_f":   waterTempJSON(data, goaquatemp.CelsiusToFahrenheit(data.InletTemp)),
+				"outlet_f":  waterTempJSON(data, goaquatemp.CelsiusToFahrenheit(data.OutletTemp)),
+				"ambient_f": goaquatemp.CelsiusToFahrenheit(data.AmbientTemp),
+
+				"water_temp_status": data.WaterTempStatus,
+				"current_raw":       data.CurrentTemp,
+				"inlet_raw":         data.InletTemp,
+				"outlet_raw":        data.OutletTemp,
 			})
 		} else if outputCSV {
-			fmt.Printf("%s,%s,%s,%s,%s,%s\n",
-				now,
-				tempStr(data.TargetTemp),
-				tempStr(data.CurrentTemp),
-				tempStr(data.InletTemp),
-				tempStr(data.OutletTemp),
-				tempStr(data.AmbientTemp),
-			)
+			row := []string{now, tempStr(data.TargetTemp), tempFStr(data.TargetTemp)}
+			for _, c := range []float64{data.CurrentTemp, data.InletTemp, data.OutletTemp} {
+				row = append(row, waterTempStr(data, c), waterTempFStr(data, c))
+			}
+			row = append(row, tempStr(data.AmbientTemp), tempFStr(data.AmbientTemp),
+				string(data.WaterTempStatus),
+				tempStr(data.CurrentTemp), tempStr(data.InletTemp), tempStr(data.OutletTemp))
+			fmt.Println(strings.Join(row, ","))
 		} else {
-			fmt.Printf("[%s] Target: %s°C  Current: %s°C  Inlet: %s°C  Outlet: %s°C  Ambient: %s°C\n",
+			fmt.Printf("[%s] Target: %s  Current: %s  Inlet: %s  Outlet: %s  Ambient: %s\n",
 				now,
-				tempStr(data.TargetTemp),
-				tempStr(data.CurrentTemp),
-				tempStr(data.InletTemp),
-				tempStr(data.OutletTemp),
-				tempStr(data.AmbientTemp),
+				bothTemps(data.TargetTemp),
+				waterTemps(data, data.CurrentTemp),
+				waterTemps(data, data.InletTemp),
+				waterTemps(data, data.OutletTemp),
+				bothTemps(data.AmbientTemp),
 			)
 		}
 	}
@@ -289,53 +314,6 @@ func runTempHistory(hours, interval int) error {
 			readAndPrint()
 		}
 	}
-}
-
-// status command
-func newStatusCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:   "status",
-		Short: "Show full device status",
-		RunE:  runStatus,
-	}
-}
-
-func runStatus(cmd *cobra.Command, args []string) error {
-	client, err := getClient()
-	if err != nil {
-		return err
-	}
-
-	code, err := requireDeviceCode(client)
-	if err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := client.Login(ctx); err != nil {
-		return fmt.Errorf("login failed: %w", err)
-	}
-
-	device, err := client.GetDevice(ctx, code)
-	if err != nil {
-		return fmt.Errorf("failed to get device: %w", err)
-	}
-
-	data, err := client.GetDeviceData(ctx, code)
-	if err != nil {
-		return fmt.Errorf("failed to get device data: %w", err)
-	}
-
-	if outputJSON {
-		return printJSON(map[string]any{
-			"device": device,
-			"data":   data,
-		})
-	}
-
-	return printStatus(device, data)
 }
 
 // control command
@@ -361,18 +339,28 @@ func newControlCmd() *cobra.Command {
 	powerCmd.Flags().BoolVar(&powerOff, "off", false, "Turn device off")
 
 	// set-temp subcommand
-	var targetTemp float64
+	var targetTemp, targetTempF float64
 	setTempCmd := &cobra.Command{
 		Use:   "set-temp",
 		Short: "Set target temperature",
+		Long: `Set the target water temperature for the current mode.
+
+Give the temperature in Celsius with --temp or in Fahrenheit with --temp-f.
+Fahrenheit is converted to Celsius and rounded to 0.1°C before sending.`,
+		Example: `  aquatemp control set-temp --temp 32
+  aquatemp control set-temp --temp-f 90`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if targetTemp == 0 {
-				return fmt.Errorf("specify temperature with --temp")
+			c, err := setTempCelsius(cmd.Flags().Changed("temp"), targetTemp,
+				cmd.Flags().Changed("temp-f"), targetTempF)
+			if err != nil {
+				return err
 			}
-			return runControlTemp(targetTemp)
+			return runControlTemp(c)
 		},
 	}
 	setTempCmd.Flags().Float64VarP(&targetTemp, "temp", "t", 0, "Target temperature in Celsius")
+	setTempCmd.Flags().Float64Var(&targetTempF, "temp-f", 0, "Target temperature in Fahrenheit")
+	setTempCmd.MarkFlagsMutuallyExclusive("temp", "temp-f")
 
 	// mode subcommand
 	var modeHeat, modeCool, modeAuto, modeOff bool
@@ -411,19 +399,15 @@ func newControlCmd() *cobra.Command {
 			switch fanSpeed {
 			case "low":
 				speed = goaquatemp.FanLow
-			case "medium":
-				speed = goaquatemp.FanMedium
-			case "high":
-				speed = goaquatemp.FanHigh
 			case "auto":
 				speed = goaquatemp.FanAuto
 			default:
-				return fmt.Errorf("invalid fan speed %q: use low, medium, high, or auto", fanSpeed)
+				return fmt.Errorf("invalid fan speed %q: use auto or low (silent)", fanSpeed)
 			}
 			return runControlFanSpeed(speed)
 		},
 	}
-	fanSpeedCmd.Flags().StringVar(&fanSpeed, "speed", "", "Fan speed: low, medium, high, auto")
+	fanSpeedCmd.Flags().StringVar(&fanSpeed, "speed", "", "Fan speed: auto or low (silent)")
 	fanSpeedCmd.MarkFlagRequired("speed")
 
 	cmd.AddCommand(powerCmd, setTempCmd, modeCmd, fanSpeedCmd)
@@ -542,3 +526,69 @@ func runControlFanSpeed(speed goaquatemp.FanSpeed) error {
 func tempStr(temp float64) string {
 	return strconv.FormatFloat(temp, 'f', 1, 64)
 }
+
+// setTempCelsius resolves the set-temp flags to a Celsius target, converting
+// --temp-f and rounding it to 0.1°C.
+func setTempCelsius(haveC bool, c float64, haveF bool, f float64) (float64, error) {
+	switch {
+	case haveC && haveF:
+		return 0, fmt.Errorf("use either --temp or --temp-f, not both")
+	case haveC:
+		return c, nil
+	case haveF:
+		return math.Round(goaquatemp.FahrenheitToCelsius(f)*10) / 10, nil
+	}
+	return 0, fmt.Errorf("specify the temperature with --temp (°C) or --temp-f (°F)")
+}
+
+// tempFStr formats a °C value converted to °F, to one decimal place.
+func tempFStr(c float64) string {
+	return tempStr(goaquatemp.CelsiusToFahrenheit(c))
+}
+
+// bothTemps formats a °C value as "28.5°C / 83.3°F".
+func bothTemps(c float64) string {
+	return tempStr(c) + "°C / " + tempFStr(c) + "°F"
+}
+
+// naValue is printed in place of a water temperature that is not valid
+// because there is no water flow.
+const naValue = "NA"
+
+// waterTemps formats a water temperature (current, inlet, outlet). With no
+// flow it prints NA and shows the reading only as a stagnant value.
+func waterTemps(d *goaquatemp.DeviceData, c float64) string {
+	if d.WaterTempsValid() {
+		return bothTemps(c)
+	}
+	return naValue + " (no flow; stagnant reading " + bothTemps(c) + ", not valid)"
+}
+
+// waterTempStr is tempStr for a water temperature: NA when there is no flow.
+func waterTempStr(d *goaquatemp.DeviceData, c float64) string {
+	if !d.WaterTempsValid() {
+		return naValue
+	}
+	return tempStr(c)
+}
+
+// waterTempFStr is tempFStr for a water temperature: NA when there is no flow.
+func waterTempFStr(d *goaquatemp.DeviceData, c float64) string {
+	if !d.WaterTempsValid() {
+		return naValue
+	}
+	return tempFStr(c)
+}
+
+// waterTempJSON is a water temperature for JSON output: null when there is
+// no flow.
+func waterTempJSON(d *goaquatemp.DeviceData, c float64) any {
+	if !d.WaterTempsValid() {
+		return nil
+	}
+	return c
+}
+
+// noFlowWarning is printed under human-readable output when the water
+// temperatures are stagnant.
+const noFlowWarning = "Warning: no water flow. Water temperatures are of stagnant water in the unit, not the pool; do not use them."

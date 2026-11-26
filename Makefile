@@ -4,6 +4,7 @@
 CLI_BINARY := aquatemp
 EXAMPLE_BINARY := temperature
 MONITOR_BINARY := monitor
+HISTORY_BINARY := history
 
 # Build variables
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
@@ -42,8 +43,12 @@ build-example: ## Build the example binary
 build-monitor: ## Build the monitor example binary
 	$(GOBUILD) -o $(MONITOR_BINARY) ./examples/monitor
 
+.PHONY: build-history
+build-history: ## Build the history example binary
+	$(GOBUILD) -o $(HISTORY_BINARY) ./examples/history
+
 .PHONY: build-all
-build-all: build build-example build-monitor ## Build all binaries
+build-all: build build-example build-monitor build-history ## Build all binaries
 
 .PHONY: test
 test: ## Run all tests
@@ -69,7 +74,7 @@ test-cover: ## Run tests with coverage report
 .PHONY: clean
 clean: ## Remove build artifacts
 	$(GOCLEAN)
-	rm -f $(CLI_BINARY) $(EXAMPLE_BINARY) $(MONITOR_BINARY)
+	rm -f $(CLI_BINARY) $(EXAMPLE_BINARY) $(MONITOR_BINARY) $(HISTORY_BINARY)
 	rm -f coverage.out coverage.html
 
 .PHONY: deps

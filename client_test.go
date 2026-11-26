@@ -2,6 +2,7 @@ package goaquatemp
 
 import (
 	"errors"
+	"math"
 	"testing"
 	"time"
 )
@@ -114,28 +115,13 @@ func TestConfigValidate(t *testing.T) {
 }
 
 func TestDeviceDataHelpers(t *testing.T) {
-	data := &DeviceData{
-		Power:     true,
-		ErrorCode: 0,
-	}
-
+	data := &DeviceData{Power: true}
 	if !data.IsPoweredOn() {
 		t.Error("expected IsPoweredOn() = true")
 	}
-
-	if data.HasError() {
-		t.Error("expected HasError() = false")
-	}
-
 	data.Power = false
-	data.ErrorCode = 1
-
 	if data.IsPoweredOn() {
 		t.Error("expected IsPoweredOn() = false")
-	}
-
-	if !data.HasError() {
-		t.Error("expected HasError() = true")
 	}
 }
 
@@ -256,80 +242,27 @@ func TestParseModeMapping(t *testing.T) {
 		input string
 		want  OperationMode
 	}{
-		{"0", ModeOff},
+		{"0", ModeCool},
 		{"1", ModeHeat},
-		{"2", ModeCool},
-		{"3", ModeAuto},
-		{"unknown", ModeOff},
-		{"", ModeOff},
+		{"2", ModeAuto},
 	}
 
 	for _, tt := range tests {
-		got := parseMode(tt.input)
-		if got != tt.want {
+		if got := parseMode(tt.input); got != tt.want {
 			t.Errorf("parseMode(%q) = %q, want %q", tt.input, got, tt.want)
 		}
-	}
-}
-
-func TestParseFanSpeedMapping(t *testing.T) {
-	tests := []struct {
-		input string
-		want  FanSpeed
-	}{
-		{"0", FanLow},
-		{"1", FanMedium},
-		{"2", FanHigh},
-		{"3", FanAuto},
-		{"unknown", FanAuto},
-		{"", FanAuto},
-	}
-
-	for _, tt := range tests {
-		got := parseFanSpeed(tt.input)
-		if got != tt.want {
-			t.Errorf("parseFanSpeed(%q) = %q, want %q", tt.input, got, tt.want)
+		if back := modeToAPI(tt.want); back != tt.input {
+			t.Errorf("modeToAPI(%q) = %q, want %q", tt.want, back, tt.input)
 		}
 	}
 }
 
-func TestModeToAPI(t *testing.T) {
-	tests := []struct {
-		input OperationMode
-		want  string
-	}{
-		{ModeOff, "0"},
-		{ModeHeat, "1"},
-		{ModeCool, "2"},
-		{ModeAuto, "3"},
-		{OperationMode("unknown"), "0"},
+func TestFanSpeedMapping(t *testing.T) {
+	if fanSpeedToAPI(FanAuto) != "0" || fanSpeedToAPI(FanLow) != "1" {
+		t.Error("fanSpeedToAPI mapping wrong")
 	}
-
-	for _, tt := range tests {
-		got := modeToAPI(tt.input)
-		if got != tt.want {
-			t.Errorf("modeToAPI(%q) = %q, want %q", tt.input, got, tt.want)
-		}
-	}
-}
-
-func TestFanSpeedToAPI(t *testing.T) {
-	tests := []struct {
-		input FanSpeed
-		want  string
-	}{
-		{FanLow, "0"},
-		{FanMedium, "1"},
-		{FanHigh, "2"},
-		{FanAuto, "3"},
-		{FanSpeed("unknown"), "3"},
-	}
-
-	for _, tt := range tests {
-		got := fanSpeedToAPI(tt.input)
-		if got != tt.want {
-			t.Errorf("fanSpeedToAPI(%q) = %q, want %q", tt.input, got, tt.want)
-		}
+	if parseFanSpeed("0") != FanAuto || parseFanSpeed("1") != FanLow {
+		t.Error("parseFanSpeed mapping wrong")
 	}
 }
 
@@ -346,5 +279,19 @@ func TestControlCommandNoFields(t *testing.T) {
 	err := c.Control(nil, command)
 	if err != nil {
 		t.Errorf("Control with no fields should return nil, got: %v", err)
+	}
+}
+
+func TestCelsiusToFahrenheit(t *testing.T) {
+	for c, want := range map[float64]float64{0: 32, 100: 212, -40: -40, 28.5: 83.3} {
+		if got := CelsiusToFahrenheit(c); math.Abs(got-want) > 1e-9 {
+			t.Errorf("CelsiusToFahrenheit(%v) = %v, want %v", c, got, want)
+		}
+	}
+	if got := FahrenheitToCelsius(212); got != 100 {
+		t.Errorf("FahrenheitToCelsius(212) = %v, want 100", got)
+	}
+	if got := CelsiusDeltaToFahrenheit(2); got != 3.6 {
+		t.Errorf("CelsiusDeltaToFahrenheit(2) = %v, want 3.6", got)
 	}
 }

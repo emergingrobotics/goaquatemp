@@ -23,8 +23,10 @@ var (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "aquatemp",
-		Short: "CLI tool for Aqua Temp heat pump control",
+		Use:           "aquatemp",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Short:         "CLI tool for Aqua Temp heat pump control",
 		Long: `aquatemp is a command-line interface for monitoring and controlling
 Aqua Temp heat pumps via the Linked-Go cloud API.
 
@@ -32,11 +34,13 @@ Configure credentials via environment variables:
   AQUATEMP_USERNAME - Your account email
   AQUATEMP_PASSWORD - Your account password
 
-Or create a config file at ~/.config/aquatemp/config.yaml`,
+Or create a config file at ~/.config/aquatemp/config.yaml
+
+Without --device, commands use the account's first device.`,
 	}
 
 	// Global flags
-	rootCmd.PersistentFlags().StringVarP(&deviceCode, "device", "d", "", "Device code (or set AQUATEMP_DEFAULT_DEVICE)")
+	rootCmd.PersistentFlags().StringVarP(&deviceCode, "device", "d", "", "Device code (or set AQUATEMP_DEFAULT_DEVICE; default: first device)")
 	rootCmd.PersistentFlags().BoolVar(&outputJSON, "json", false, "Output in JSON format")
 	rootCmd.PersistentFlags().BoolVar(&outputCSV, "csv", false, "Output in CSV format")
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Enable debug output")
@@ -47,6 +51,8 @@ Or create a config file at ~/.config/aquatemp/config.yaml`,
 		newDevicesCmd(),
 		newTempCmd(),
 		newStatusCmd(),
+		newHistoryCmd(),
+		newParamsCmd(),
 		newControlCmd(),
 		newVersionCmd(),
 	)

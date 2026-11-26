@@ -92,27 +92,31 @@ func main() {
 	fmt.Printf(" Power:        %s\n", formatPower(data.Power))
 	fmt.Printf(" Mode:         %s\n", data.Mode)
 	fmt.Printf(" Fan Speed:    %s\n", data.FanSpeed)
-
-	if data.ErrorCode != 0 {
-		fmt.Printf(" Error Code:   %d\n", data.ErrorCode)
-	}
 	fmt.Println()
 
 	// Temperatures
 	fmt.Println(" Temperatures")
 	fmt.Println(" " + repeatStr("-", 25))
-	fmt.Printf(" Target:       %.1f°C\n", data.TargetTemp)
-	fmt.Printf(" Current:      %.1f°C\n", data.CurrentTemp)
-	fmt.Printf(" Inlet:        %.1f°C\n", data.InletTemp)
-	fmt.Printf(" Outlet:       %.1f°C\n", data.OutletTemp)
-	fmt.Printf(" Ambient:      %.1f°C\n", data.AmbientTemp)
-	fmt.Printf(" Coil:         %.1f°C\n", data.CoilTemp)
+	fmt.Printf(" Target:       %.1f°C / %.1f°F\n", data.TargetTemp, goaquatemp.CelsiusToFahrenheit(data.TargetTemp))
+	// With no water flow the water sensors read stagnant water: show NA.
+	waterTemp := func(c float64) string {
+		s := fmt.Sprintf("%.1f°C / %.1f°F", c, goaquatemp.CelsiusToFahrenheit(c))
+		if !data.WaterTempsValid() {
+			return "NA (no flow; stagnant " + s + ")"
+		}
+		return s
+	}
+	fmt.Printf(" Current:      %s\n", waterTemp(data.CurrentTemp))
+	fmt.Printf(" Inlet:        %s\n", waterTemp(data.InletTemp))
+	fmt.Printf(" Outlet:       %s\n", waterTemp(data.OutletTemp))
+	fmt.Printf(" Ambient:      %.1f°C / %.1f°F\n", data.AmbientTemp, goaquatemp.CelsiusToFahrenheit(data.AmbientTemp))
+	fmt.Printf(" Coil:         %.1f°C / %.1f°F\n", data.CoilTemp, goaquatemp.CelsiusToFahrenheit(data.CoilTemp))
 	fmt.Println()
 
 	// Delta calculation
-	if data.InletTemp > 0 && data.OutletTemp > 0 {
+	if data.WaterTempsValid() && data.InletTemp > 0 && data.OutletTemp > 0 {
 		delta := data.OutletTemp - data.InletTemp
-		fmt.Printf(" Delta (Out-In): %.1f°C\n", delta)
+		fmt.Printf(" Delta (Out-In): %.1f°C / %.1f°F\n", delta, goaquatemp.CelsiusDeltaToFahrenheit(delta))
 		fmt.Println()
 	}
 

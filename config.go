@@ -15,7 +15,7 @@ type APIVersion string
 const (
 	// APILegacy is for accounts created before app v1.5.8.
 	APILegacy APIVersion = "legacy"
-	// APIHiTemp is for HiTemp branded devices.
+	// APIHiTemp is for HiTemp branded devices (same endpoint as modern).
 	APIHiTemp APIVersion = "hitemp"
 	// APIModern is for accounts created with app v1.5.9+ (default).
 	APIModern APIVersion = "modern"
@@ -24,7 +24,7 @@ const (
 // API base URLs for different versions.
 const (
 	BaseURLLegacy = "https://cloud.linked-go.com/cloudservice/api"
-	BaseURLHiTemp = "https://cloud.linked-go.com/cloudservice/api"
+	BaseURLHiTemp = "https://cloud.linked-go.com:449/crmservice/api"
 	BaseURLModern = "https://cloud.linked-go.com:449/crmservice/api"
 )
 

@@ -9,7 +9,8 @@ goaquatemp is a Go module that provides an SDK and CLI tool for interacting with
 ## Key Documentation
 
 - `docs/DESIGN.md` - Detailed design document with architecture diagrams, data models, and sequence diagrams
-- `docs/general.md` - API documentation including endpoints, authentication, and account setup
+- `docs/api-docs.md` - **Cloud API reference**: endpoints, wire formats, protocol codes, status bits, history (probed live)
+- `docs/general.md` - API background and account setup
 
 ## Project Structure
 
@@ -17,7 +18,9 @@ goaquatemp is a Go module that provides an SDK and CLI tool for interacting with
 goaquatemp/
 ├── client.go           # Main client interface and implementation
 ├── config.go           # Configuration types and defaults
-├── device.go           # Device types and methods
+├── device.go           # Device, DeviceData, DeviceStatus types
+├── history.go          # History types (series, resolutions)
+├── parameters.go       # Parameter catalog types
 ├── errors.go           # Custom error types
 ├── options.go          # Functional options for client
 ├── internal/           # Private implementation details
@@ -41,18 +44,29 @@ goaquatemp/
 
 The Aqua Temp API has three versions - code must handle all:
 
-| Version | Base URL | Password |
-|---------|----------|----------|
-| Legacy (pre-v1.5.8) | `cloud.linked-go.com/cloudservice/api` | Plain text |
-| HiTemp | `cloud.linked-go.com/cloudservice/api` | Plain text |
-| Modern (v1.5.9+) | `cloud.linked-go.com:449/crmservice/api` | MD5 hashed |
+| Version | Base URL | Fields / paths |
+|---------|----------|----------------|
+| Legacy (pre-v1.5.8) | `cloud.linked-go.com/cloudservice/api` | snake_case, `.json` suffix |
+| HiTemp | `cloud.linked-go.com:449/crmservice/api` | same as modern |
+| Modern (v1.5.9+) | `cloud.linked-go.com:449/crmservice/api` | camelCase, no suffix |
+
+All versions send the MD5 hex of the password. The per-version differences live in
+`api.Dialect` (`internal/api/requests.go`).
 
 ## Key Endpoints
 
-- `POST /app/user/login.json` - Authentication, returns x-token
-- `POST /app/device/deviceList.json` - List devices
-- `POST /app/device/getDataByCode.json` - Get device sensor data
-- `POST /app/device/control.json` - Control device settings
+Modern paths (legacy appends `.json`); see `docs/api-docs.md` for formats.
+
+- `POST /app/user/login` - Authentication, returns `x-token` (sent back bare in the `x-token` header)
+- `POST /app/device/deviceList`, `/app/device/getMyAppectDeviceShareDataList` - List devices
+- `POST /app/device/v5/getDataByCode` - Device values (`codes`) and status bits (`bitCodes`)
+- `POST /app/device/getDeviceStatus`, `/app/device/getFaultDataByDeviceCode` - Online / faults
+- `POST /app/device/control` - Control (`{"param":[{deviceCode, protocolCode, value}]}`)
+- `POST /device/snapshot/listCollectData` - History (not under `/app`)
+- `POST /app/device/getControlDetailStatusByDeviceCode`, `/app/device/getControlParamConfigByDeviceCode` - Parameter catalogs
+
+Responses: `error_code` is a string; `"-100"` means the token is invalid (re-login and retry once).
+The account allows one session at a time.
 
 ## Testing
 
@@ -101,10 +115,16 @@ export AQUATEMP_DEBUG="true"
 2. Add request/response types in `internal/api/requests.go` and `responses.go`
 3. Add method to `Client` interface in `client.go`
 4. Implement method in client implementation
-5. Add CLI command if user-facing in `cmd/aquatemp/`
+5. Add a handler to the fake server in `internal/testutil/server.go` (mirror the real wire format) and tests
+6. Add the method to `mockClient` in `cmd/aquatemp/main_test.go`
+7. Add CLI command if user-facing in `cmd/aquatemp/`
+8. Document the endpoint in `docs/api-docs.md`
 
 ### Adding a new device parameter
 
-1. Add field to `DeviceData` struct in `device.go`
-2. Map the parameter code in the response parser
-3. Update CLI output formatters if needed
+1. Add the code to `DefaultDataCodes` (or a bit to `DefaultBitCodes`) in `internal/api/endpoints.go`
+2. Parse it in `ParseDeviceData` (`internal/api/responses.go`)
+3. Add the field to `DeviceData` in `device.go` and map it in `parsedDataToDeviceData` (`client.go`)
+4. Update CLI output formatters if needed (`cmd/aquatemp/features.go`)
+
+Use `aquatemp params` against a real device to discover codes, labels and history addresses.

@@ -50,18 +50,36 @@ func main() {
 			return
 		}
 
-		power := "OFF"
-		if data.Power {
-			power = "ON"
+		compressor := "?"
+		if data.CompressorRunning != nil {
+			compressor = "off"
+			if *data.CompressorRunning {
+				compressor = "on"
+				if data.CompressorFrequency != nil {
+					compressor = fmt.Sprintf("%.0fHz", *data.CompressorFrequency)
+				}
+			}
 		}
 
-		fmt.Printf("[%s] Power: %s  Mode: %s  Current: %.1fC  Target: %.1fC  Ambient: %.1fC\n",
+		ct := func(c float64) string {
+			return fmt.Sprintf("%.1fC/%.1fF", c, goaquatemp.CelsiusToFahrenheit(c))
+		}
+		// With no water flow the water sensors read stagnant water: NA.
+		wt := func(c float64) string {
+			if !data.WaterTempsValid() {
+				return "NA(" + ct(c) + ")"
+			}
+			return ct(c)
+		}
+		fmt.Printf("[%s] %-10s mode=%-4s compressor=%-5s inlet=%s outlet=%s ambient=%s target=%s\n",
 			time.Now().Format("15:04:05"),
-			power,
+			data.State,
 			data.Mode,
-			data.CurrentTemp,
-			data.TargetTemp,
-			data.AmbientTemp,
+			compressor,
+			wt(data.InletTemp),
+			wt(data.OutletTemp),
+			ct(data.AmbientTemp),
+			ct(data.TargetTemp),
 		)
 	}
 

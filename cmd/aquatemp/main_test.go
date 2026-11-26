@@ -380,6 +380,15 @@ func (m *mockClient) Control(ctx context.Context, command goaquatemp.ControlComm
 	return nil
 }
 func (m *mockClient) IsAuthenticated() bool { return false }
+func (m *mockClient) GetDeviceStatus(ctx context.Context, deviceCode string) (*goaquatemp.DeviceStatus, error) {
+	return nil, nil
+}
+func (m *mockClient) GetHistory(ctx context.Context, deviceCode string, q goaquatemp.HistoryQuery) (*goaquatemp.History, error) {
+	return nil, nil
+}
+func (m *mockClient) GetParameters(ctx context.Context, deviceCode string, kind goaquatemp.ParameterKind) ([]goaquatemp.Parameter, error) {
+	return nil, nil
+}
 func (m *mockClient) Config() *goaquatemp.Config {
 	return &goaquatemp.Config{
 		DefaultDevice: m.defaultDevice,

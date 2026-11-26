@@ -94,41 +94,12 @@ func TestMd5Hash(t *testing.T) {
 	}
 }
 
-func TestPreparePasswordModernMD5(t *testing.T) {
-	m := &Manager{
-		apiVersion: APIModern,
-		password:   "testpassword",
-	}
-
-	got := m.preparePassword()
-	want := md5Hash("testpassword")
-
-	if got != want {
-		t.Errorf("preparePassword() = %q; want MD5 hash %q", got, want)
-	}
-}
-
-func TestPreparePasswordLegacyPlain(t *testing.T) {
-	m := &Manager{
-		apiVersion: APIVersion("legacy"),
-		password:   "testpassword",
-	}
-
-	got := m.preparePassword()
-	if got != "testpassword" {
-		t.Errorf("preparePassword() = %q; want plain text %q", got, "testpassword")
-	}
-}
-
-func TestPreparePasswordHiTempPlain(t *testing.T) {
-	m := &Manager{
-		apiVersion: APIVersion("hitemp"),
-		password:   "testpassword",
-	}
-
-	got := m.preparePassword()
-	if got != "testpassword" {
-		t.Errorf("preparePassword() = %q; want plain text %q", got, "testpassword")
+func TestPreparePasswordAlwaysMD5(t *testing.T) {
+	for _, v := range []string{"modern", "hitemp", "legacy"} {
+		m := &Manager{apiVersion: APIVersion(v), password: "testpassword"}
+		if got, want := m.preparePassword(), md5Hash("testpassword"); got != want {
+			t.Errorf("%s: preparePassword() = %q; want %q", v, got, want)
+		}
 	}
 }
 
@@ -146,7 +117,7 @@ func TestFormatTokenHeader(t *testing.T) {
 	})
 
 	got := m.FormatTokenHeader()
-	want := "bearer abc123"
+	want := "abc123"
 	if got != want {
 		t.Errorf("FormatTokenHeader() = %q; want %q", got, want)
 	}

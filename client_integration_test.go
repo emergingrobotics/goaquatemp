@@ -14,41 +14,28 @@ func setupIntegrationTest(t *testing.T) (*testutil.FakeServer, Client) {
 	t.Cleanup(server.Close)
 
 	server.Devices = []testutil.DeviceInfo{
-		{
-			DeviceCode:   "DEV001",
-			DeviceNick:   "Pool Heater",
-			DeviceType:   "1",
-			OnlineStatus: "1",
-			ProductCode:  "PROD001",
-			CreateTime:   "2024-01-15 10:30:00",
-		},
-		{
-			DeviceCode:   "DEV002",
-			DeviceNick:   "Spa Heater",
-			DeviceType:   "1",
-			OnlineStatus: "0",
-			ProductCode:  "PROD001",
-			CreateTime:   "2024-03-20 14:00:00",
-		},
+		{DeviceCode: "DEV001", DeviceNickName: "Pool Heater", DeviceStatus: "ONLINE", ProductID: "PROD001"},
+		{DeviceCode: "DEV002", DeviceNickName: "Spa Heater", DeviceStatus: "OFFLINE", ProductID: "PROD001"},
 	}
 
 	server.DeviceData["DEV001"] = []testutil.Parameter{
 		{Code: "Power", Value: "1"},
 		{Code: "Mode", Value: "1"},
+		{Code: "R01", Value: "20"},
 		{Code: "R02", Value: "28.5"},
+		{Code: "Set_Temp", Value: "28.5"},
 		{Code: "T02", Value: "26.3"},
-		{Code: "T03", Value: "25.0"},
-		{Code: "T04", Value: "27.1"},
+		{Code: "T03", Value: "27.1"},
+		{Code: "T04", Value: "30.5"},
 		{Code: "T05", Value: "22.0"},
-		{Code: "T06", Value: "30.5"},
-		{Code: "Manual-mute", Value: "3"},
-		{Code: "T14", Value: "0"},
+		{Code: "T06", Value: "45.0"},
+		{Code: "Manual-mute", Value: "0"},
 	}
 
 	client, err := NewClient(
 		WithUsername(server.Username),
 		WithPassword(server.Password),
-		WithAPIVersion(APILegacy),
+		WithAPIVersion(APIModern),
 		WithBaseURL(server.URL()),
 		WithRetryCount(0),
 	)
@@ -83,7 +70,7 @@ func TestIntegrationLoginWithInvalidCredentials(t *testing.T) {
 	client, err := NewClient(
 		WithUsername("wrong@example.com"),
 		WithPassword("wrongpass"),
-		WithAPIVersion(APILegacy),
+		WithAPIVersion(APIModern),
 		WithBaseURL(server.URL()),
 		WithRetryCount(0),
 	)
@@ -203,8 +190,8 @@ func TestIntegrationGetDeviceDataParsing(t *testing.T) {
 	if data.CurrentTemp != 26.3 {
 		t.Errorf("CurrentTemp = %f, want 26.3", data.CurrentTemp)
 	}
-	if data.InletTemp != 25.0 {
-		t.Errorf("InletTemp = %f, want 25.0", data.InletTemp)
+	if data.InletTemp != 26.3 {
+		t.Errorf("InletTemp = %f, want 26.3", data.InletTemp)
 	}
 	if data.OutletTemp != 27.1 {
 		t.Errorf("OutletTemp = %f, want 27.1", data.OutletTemp)
@@ -217,9 +204,6 @@ func TestIntegrationGetDeviceDataParsing(t *testing.T) {
 	}
 	if data.FanSpeed != FanAuto {
 		t.Errorf("FanSpeed = %q, want %q", data.FanSpeed, FanAuto)
-	}
-	if data.ErrorCode != 0 {
-		t.Errorf("ErrorCode = %d, want 0", data.ErrorCode)
 	}
 }
 
@@ -235,20 +219,10 @@ func TestIntegrationSetTemperature(t *testing.T) {
 		t.Fatalf("SetTemperature() error = %v", err)
 	}
 
-	if len(server.ControlCalls) != 1 {
-		t.Fatalf("ControlCalls count = %d, want 1", len(server.ControlCalls))
-	}
-
-	call := server.ControlCalls[0]
-	if call.DeviceCode != "DEV001" {
-		t.Errorf("ControlCall.DeviceCode = %q, want %q", call.DeviceCode, "DEV001")
-	}
-	if call.ProtocolCode != "R02" {
-		t.Errorf("ControlCall.ProtocolCode = %q, want %q", call.ProtocolCode, "R02")
-	}
-	if call.Value != "28.0" {
-		t.Errorf("ControlCall.Value = %q, want %q", call.Value, "28.0")
-	}
+	assertControl(t, server, 1, []testutil.ControlCall{
+		{DeviceCode: "DEV001", ProtocolCode: "R02", Value: 28.0},
+		{DeviceCode: "DEV001", ProtocolCode: "Set_Temp", Value: 28.0},
+	})
 }
 
 func TestIntegrationSetTemperatureOutOfRange(t *testing.T) {
@@ -276,17 +250,22 @@ func TestIntegrationSetMode(t *testing.T) {
 		t.Fatalf("SetMode() error = %v", err)
 	}
 
-	if len(server.ControlCalls) != 1 {
-		t.Fatalf("ControlCalls count = %d, want 1", len(server.ControlCalls))
+	assertControl(t, server, 1, []testutil.ControlCall{
+		{DeviceCode: "DEV001", ProtocolCode: "power", Value: "1"},
+		{DeviceCode: "DEV001", ProtocolCode: "Mode", Value: "0"},
+	})
+}
+
+func TestIntegrationSetModeOffTurnsPowerOff(t *testing.T) {
+	server, client := setupIntegrationTest(t)
+
+	if err := client.SetMode(context.Background(), "DEV001", ModeOff); err != nil {
+		t.Fatalf("SetMode() error = %v", err)
 	}
 
-	call := server.ControlCalls[0]
-	if call.ProtocolCode != "Mode" {
-		t.Errorf("ControlCall.ProtocolCode = %q, want %q", call.ProtocolCode, "Mode")
-	}
-	if call.Value != "2" {
-		t.Errorf("ControlCall.Value = %q, want %q", call.Value, "2")
-	}
+	assertControl(t, server, 1, []testutil.ControlCall{
+		{DeviceCode: "DEV001", ProtocolCode: "power", Value: "0"},
+	})
 }
 
 func TestIntegrationSetPowerOnOff(t *testing.T) {
@@ -305,16 +284,10 @@ func TestIntegrationSetPowerOnOff(t *testing.T) {
 		t.Fatalf("SetPower(false) error = %v", err)
 	}
 
-	if len(server.ControlCalls) != 2 {
-		t.Fatalf("ControlCalls count = %d, want 2", len(server.ControlCalls))
-	}
-
-	if server.ControlCalls[0].Value != "1" {
-		t.Errorf("SetPower(true) value = %q, want %q", server.ControlCalls[0].Value, "1")
-	}
-	if server.ControlCalls[1].Value != "0" {
-		t.Errorf("SetPower(false) value = %q, want %q", server.ControlCalls[1].Value, "0")
-	}
+	assertControl(t, server, 2, []testutil.ControlCall{
+		{DeviceCode: "DEV001", ProtocolCode: "power", Value: "1"},
+		{DeviceCode: "DEV001", ProtocolCode: "power", Value: "0"},
+	})
 }
 
 func TestIntegrationLogoutClearsToken(t *testing.T) {
@@ -360,17 +333,67 @@ func TestIntegrationControlCommand(t *testing.T) {
 		t.Fatalf("Control() error = %v", err)
 	}
 
-	if len(server.ControlCalls) != 3 {
-		t.Fatalf("ControlCalls count = %d, want 3", len(server.ControlCalls))
+	assertControl(t, server, 1, []testutil.ControlCall{
+		{DeviceCode: "DEV001", ProtocolCode: "power", Value: "1"},
+		{DeviceCode: "DEV001", ProtocolCode: "Mode", Value: "0"},
+		{DeviceCode: "DEV001", ProtocolCode: "R01", Value: 25.0},
+		{DeviceCode: "DEV001", ProtocolCode: "Set_Temp", Value: 25.0},
+	})
+}
+
+func TestIntegrationSharedDevicesListed(t *testing.T) {
+	server, client := setupIntegrationTest(t)
+	server.SharedDevices = []testutil.DeviceInfo{
+		{DeviceCode: "DEV003", DeviceNickName: "Shared Heater", DeviceStatus: "ONLINE"},
+		{DeviceCode: "DEV001", DeviceNickName: "Pool Heater", DeviceStatus: "ONLINE"}, // duplicate
 	}
 
-	if server.ControlCalls[0].ProtocolCode != "Power" || server.ControlCalls[0].Value != "1" {
-		t.Errorf("ControlCall[0] = %+v, want Power=1", server.ControlCalls[0])
+	devices, err := client.GetDevices(context.Background())
+	if err != nil {
+		t.Fatalf("GetDevices() error = %v", err)
 	}
-	if server.ControlCalls[1].ProtocolCode != "Mode" || server.ControlCalls[1].Value != "2" {
-		t.Errorf("ControlCall[1] = %+v, want Mode=2", server.ControlCalls[1])
+	if len(devices) != 3 || devices[2].Code != "DEV003" {
+		t.Errorf("GetDevices() = %+v, want DEV001, DEV002, DEV003", devices)
 	}
-	if server.ControlCalls[2].ProtocolCode != "R02" || server.ControlCalls[2].Value != "25.0" {
-		t.Errorf("ControlCall[2] = %+v, want R02=25.0", server.ControlCalls[2])
+}
+
+func TestIntegrationReloginOnInvalidToken(t *testing.T) {
+	server, client := setupIntegrationTest(t)
+	ctx := context.Background()
+
+	if err := client.Login(ctx); err != nil {
+		t.Fatalf("Login() error = %v", err)
+	}
+
+	// Token revoked server-side (e.g. the mobile app logged in).
+	server.InvalidateToken("new-token")
+
+	if _, err := client.GetDevices(ctx); err != nil {
+		t.Fatalf("GetDevices() after token revocation error = %v", err)
+	}
+	if server.LoginCount != 2 {
+		t.Errorf("LoginCount = %d, want 2 (re-login after -100)", server.LoginCount)
+	}
+}
+
+func TestIntegrationSetFanSpeedRejectsUnsupported(t *testing.T) {
+	_, client := setupIntegrationTest(t)
+	if err := client.SetFanSpeed(context.Background(), "DEV001", FanSpeed("high")); err == nil {
+		t.Fatal("SetFanSpeed(high) expected validation error")
+	}
+}
+
+func assertControl(t *testing.T, server *testutil.FakeServer, wantReqs int, want []testutil.ControlCall) {
+	t.Helper()
+	if server.ControlReqs != wantReqs {
+		t.Errorf("control requests = %d, want %d", server.ControlReqs, wantReqs)
+	}
+	if len(server.ControlCalls) != len(want) {
+		t.Fatalf("ControlCalls = %+v, want %+v", server.ControlCalls, want)
+	}
+	for i := range want {
+		if server.ControlCalls[i] != want[i] {
+			t.Errorf("ControlCalls[%d] = %+v, want %+v", i, server.ControlCalls[i], want[i])
+		}
 	}
 }
