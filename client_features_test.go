@@ -29,6 +29,9 @@ var heatingParams = []testutil.Parameter{
 	{Code: "T06", Value: "66.0"},
 	{Code: "O07", Value: "70"},
 	{Code: "O08", Value: "6.9"},
+	{Code: "T14", Value: "221"},
+	{Code: "Z04", Value: "24.3"},
+	{Code: "Z06", Value: "460.6"},
 	{Code: "H08", Value: "85"},
 	{Code: "H09", Value: "52"},
 	{Code: "H12", Value: "3"},
@@ -84,6 +87,18 @@ func TestGetDeviceDataUsesV5WithBits(t *testing.T) {
 	}
 	if data.WaterFlowing == nil || !*data.WaterFlowing {
 		t.Errorf("WaterFlowing = %v, want true (bit 0 = flowing)", data.WaterFlowing)
+	}
+	for name, c := range map[string]struct {
+		got  *float64
+		want float64
+	}{
+		"InverterInputVoltage": {data.InverterInputVoltage, 221},
+		"RealPowerRaw":         {data.RealPowerRaw, 24.3},
+		"EnergyTotal":          {data.EnergyTotal, 460.6},
+	} {
+		if c.got == nil || *c.got != c.want {
+			t.Errorf("%s = %v, want %v", name, c.got, c.want)
+		}
 	}
 	if data.WaterTempStatus != WaterTempValid {
 		t.Errorf("WaterTempStatus = %q, want valid", data.WaterTempStatus)

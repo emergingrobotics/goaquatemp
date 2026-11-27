@@ -108,6 +108,20 @@ type DeviceData struct {
 	CompressorSpeed   *float64 `json:"compressorSpeed,omitempty"`
 	CompressorCurrent *float64 `json:"compressorCurrent,omitempty"`
 
+	// InverterInputVoltage is the inverter board's AC input voltage (T14),
+	// in V. The parameter catalog labels it "A"; the values (around 220-230)
+	// are volts. With CompressorCurrent it gives a rough compressor power
+	// estimate (V x A); that leaves out the fan, controls and power factor.
+	InverterInputVoltage *float64 `json:"inverterInputVoltage,omitempty"`
+	// RealPowerRaw is Z04 ("Real power value", catalog range 0-100 kW) as
+	// reported. Its unit is unverified: a probe read 24.3 while V x A was about
+	// 1,525 W. Calibrate against a real meter before using it.
+	RealPowerRaw *float64 `json:"realPowerRaw,omitempty"`
+	// EnergyTotal is Z06, the unit's accumulated electricity counter. Probably
+	// kWh (it rose 460.6 -> 471.1 over ten days of light use); unverified.
+	// Differences between readings give energy used.
+	EnergyTotal *float64 `json:"energyTotal,omitempty"`
+
 	// WaterFlowing reports the water flow switch (modern API only).
 	WaterFlowing *bool `json:"waterFlowing,omitempty"`
 	// WaterTempStatus is derived from WaterFlowing. When it is

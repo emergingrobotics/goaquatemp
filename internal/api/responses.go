@@ -152,6 +152,10 @@ type ParsedDeviceData struct {
 	CompressorCurrent *float64 // A
 	CompressorType    *float64
 
+	InverterInputVoltage *float64 // V (T14)
+	RealPowerRaw         *float64 // Z04, unit unverified
+	EnergyTotal          *float64 // Z06, accumulated electricity, probably kWh
+
 	WaterFlowing *bool
 	ExternalStop *bool
 	SensorFaults []string // names of status bits reporting a sensor fault
@@ -203,9 +207,13 @@ func ParseDeviceData(params map[string]string) *ParsedDeviceData {
 		CompressorFreq:    optFloat(params, ParamCompFreq),
 		CompressorCurrent: optFloat(params, ParamCompCurrent),
 		CompressorType:    optFloat(params, ParamCompType),
-		WaterFlowing:      optBool(params, BitWaterFlow, "0"),
-		ExternalStop:      optBool(params, BitEmergencyStop, "1"),
-		RawParams:         params,
+
+		InverterInputVoltage: optFloat(params, ParamInverterVolts),
+		RealPowerRaw:         optFloat(params, ParamRealPower),
+		EnergyTotal:          optFloat(params, ParamEnergyTotal),
+		WaterFlowing:         optBool(params, BitWaterFlow, "0"),
+		ExternalStop:         optBool(params, BitEmergencyStop, "1"),
+		RawParams:            params,
 	}
 
 	if code := TargetCodeForMode(data.Mode); code != "" && params[code] != "" {

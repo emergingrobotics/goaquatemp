@@ -235,4 +235,7 @@ func TestParseDeviceDataBitsAndOptionals(t *testing.T) {
 	if d.ExternalStop != nil {
 		t.Error("absent bit should give nil ExternalStop")
 	}
+	if d.InverterInputVoltage != nil || d.RealPowerRaw != nil || d.EnergyTotal != nil {
+		t.Error("absent electrical codes should give nil fields, not 0")
+	}
 }

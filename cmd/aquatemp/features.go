@@ -126,6 +126,26 @@ func compressorText(d *goaquatemp.DeviceData) string {
 	return text
 }
 
+// electricalText shows the inverter input voltage, the V x A compressor
+// estimate and the raw power/energy counters (both unverified).
+func electricalText(d *goaquatemp.DeviceData) string {
+	num := func(v float64) string { return strconv.FormatFloat(v, 'f', -1, 64) }
+	var parts []string
+	if d.InverterInputVoltage != nil {
+		parts = append(parts, num(*d.InverterInputVoltage)+" V in")
+		if d.CompressorCurrent != nil {
+			parts = append(parts, fmt.Sprintf("~%.0f W compressor (V x A)", *d.InverterInputVoltage**d.CompressorCurrent))
+		}
+	}
+	if d.RealPowerRaw != nil {
+		parts = append(parts, "Z04 "+num(*d.RealPowerRaw)+" (unit unverified)")
+	}
+	if d.EnergyTotal != nil {
+		parts = append(parts, "Z06 "+num(*d.EnergyTotal)+" (probably kWh)")
+	}
+	return strings.Join(parts, ", ")
+}
+
 func waterFlowText(d *goaquatemp.DeviceData) string {
 	if d.WaterFlowing == nil {
 		return "unknown"
@@ -169,6 +189,9 @@ func printStatus(device *goaquatemp.Device, st *goaquatemp.DeviceStatus, d *goaq
 	fmt.Printf("Mode:        %s\n", d.Mode)
 	fmt.Printf("State:       %s\n", d.State)
 	fmt.Printf("Compressor:  %s\n", compressorText(d))
+	if e := electricalText(d); e != "" {
+		fmt.Printf("Electrical:  %s\n", e)
+	}
 	fmt.Printf("Water:       %s\n", waterFlowText(d))
 	fmt.Printf("Fan:         %s\n", d.FanSpeed)
 	fmt.Printf("Faults:      %s\n", faultText(st, d))
@@ -232,6 +255,10 @@ func printStatusCSV(device *goaquatemp.Device, st *goaquatemp.DeviceStatus, d *g
 		{"compressor_hz", opt(d.CompressorFrequency)},
 		{"compressor_max_hz", opt(d.CompressorMaxFrequency)},
 		{"compressor_pct", opt(d.CompressorSpeed)},
+		{"compressor_a", opt(d.CompressorCurrent)},
+		{"inverter_input_v", opt(d.InverterInputVoltage)},
+		{"real_power_raw", opt(d.RealPowerRaw)},
+		{"energy_total", opt(d.EnergyTotal)},
 		{"water_flowing", optB(d.WaterFlowing)},
 		{"water_temp_status", string(d.WaterTempStatus)},
 		{"fan", string(d.FanSpeed)},
